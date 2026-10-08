@@ -1,0 +1,109 @@
+# Переиспользуемый запуск EditMode-тестов Unity (GameCI).
+# Unity-код при этом полностью компилируется, так что это и сборка-проверка, и тесты.
+name: _unity-tests
+
+on:
+  workflow_call:
+    inputs:
+      require-license:
+        description: "Падать, если нет секретов лицензии Unity (main/release -- да, PR из форков -- нет)"
+        type: boolean
+        default: false
+      mutation:
+        description: "id засеянного дефекта из ci/mutations.json (пусто -- обычный прогон)"
+        type: string
+        default: ""
+    secrets:
+      UNITY_LICENSE:
+        required: false
+      UNITY_EMAIL:
+        required: false
+      UNITY_PASSWORD:
+        required: false
+    outputs:
+      tests-outcome:
+        description: "success / failure / skipped"
+        value: ${{ jobs.tests.outputs.outcome }}
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  tests:
+    name: EditMode tests${{ inputs.mutation != '' && format(' [мутант {0}]', inputs.mutation) || '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      outcome: ${{ steps.result.outputs.outcome }}
+    env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+    steps:
+      - name: Есть ли лицензия Unity
+        id: license
+        run: |
+          if [ -n "$UNITY_LICENSE" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.require-license }}" = "true" ]; then
+            echo "::error::Нет секрета UNITY_LICENSE -- см. docs/CI.md, раздел 'Настройка'"; exit 1
+          fi
+          echo "::warning::Нет секрета UNITY_LICENSE -- Unity-тесты пропущены (PR из форка?)"
+
+      - uses: actions/checkout@v4
+        if: steps.license.outputs.ok == 'true'
+        with:
+          lfs: false
+
+      # LFS качаем через кэш: бесплатный трафик LFS на GitHub ограничен
+      - name: Список LFS-файлов (ключ кэша)
+        if: steps.license.outputs.ok == 'true'
+        run: git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+      - uses: actions/cache@v4
+        if: steps.license.outputs.ok == 'true'
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+      - name: git lfs pull
+        if: steps.license.outputs.ok == 'true'
+        run: git lfs pull
+
+      - name: Засеять дефект
+        if: steps.license.outputs.ok == 'true' && inputs.mutation != ''
+        run: python3 ci/apply_mutation.py "${{ inputs.mutation }}"
+
+      - uses: actions/cache@v4
+        if: steps.license.outputs.ok == 'true'
+        with:
+          path: Library
+          key: Library-tests-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-tests-
+
+      - name: Unity EditMode tests
+        id: unity
+        if: steps.license.outputs.ok == 'true'
+        continue-on-error: ${{ inputs.mutation != '' }}   # для мутантов падение тестов -- ожидаемый результат
+        uses: game-ci/unity-test-runner@v4
+        with:
+          testMode: editmode
+          artifactsPath: test-results
+          githubToken: ${{ inputs.mutation == '' && secrets.GITHUB_TOKEN || '' }}
+          checkName: EditMode test results
+
+      - name: Итог
+        id: result
+        if: always()
+        run: |
+          if [ "${{ steps.license.outputs.ok }}" != "true" ]; then echo "outcome=skipped" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "outcome=${{ steps.unity.outcome }}" >> "$GITHUB_OUTPUT"
+          # Явный исход прогона: нужен для подсчёта мутантов (при ошибке компиляции XML с тестами нет)
+          mkdir -p test-results && echo "${{ steps.unity.outcome }}" > test-results/outcome.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.license.outputs.ok == 'true'
+        with:
+          name: test-results${{ inputs.mutation != '' && format('-{0}', inputs.mutation) || '' }}
+          path: test-results
+          retention-days: 7

@@ -1,0 +1,125 @@
+# Проверки конкретных ПЗ: запускаются вручную (Actions -> "PZ checks" -> Run workflow),
+# когда этого требует работа. В PR/main pipeline они не живут.
+#
+#  mutation     -- засеянные дефекты из ci/mutations.json: каждый вносится в код, тесты
+#                  должны УПАСТЬ ("мутант убит"). Выживший мутант = дыра в тестах.
+#  diagnostics  -- сборка под Linux и запуск в диагностическом режиме (-diag) с отчётом:
+#                  журнал игры, время старта, FPS, число ошибок.
+name: PZ checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      check:
+        description: "Какую проверку запустить"
+        type: choice
+        options: [mutation, diagnostics]
+        default: mutation
+      seconds:
+        description: "diagnostics: сколько секунд игра работает после загрузки сцены"
+        default: "20"
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  # ---------- Mutation / seeded defects ----------
+  list-mutants:
+    if: inputs.check == 'mutation'
+    runs-on: ubuntu-latest
+    outputs:
+      ids: ${{ steps.list.outputs.ids }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: echo "ids=$(python3 ci/apply_mutation.py --list)" >> "$GITHUB_OUTPUT"
+
+  baseline:
+    if: inputs.check == 'mutation'
+    uses: ./.github/workflows/_unity-tests.yml
+    with:
+      require-license: true
+    secrets: inherit
+
+  mutant:
+    needs: [list-mutants, baseline]
+    strategy:
+      fail-fast: false
+      matrix:
+        id: ${{ fromJson(needs.list-mutants.outputs.ids) }}
+    uses: ./.github/workflows/_unity-tests.yml
+    with:
+      require-license: true
+      mutation: ${{ matrix.id }}
+    secrets: inherit
+
+  mutation-verdict:
+    needs: mutant
+    if: always() && inputs.check == 'mutation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: results
+      - name: Мутанты убиты?
+        run: |
+          # Тесты упали (или код с дефектом не скомпилировался) -- мутант убит
+          killed=0; survived=0
+          echo "## Засеянные дефекты" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Мутант | Результат |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for d in results/test-results-*; do
+            id="${d#results/test-results-}"
+            if [ "$(cat "$d/outcome.txt" 2>/dev/null)" = "failure" ] || grep -rqE 'failed="[1-9]' "$d" 2>/dev/null; then
+              killed=$((killed+1)); echo "| $id | ✅ убит |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              survived=$((survived+1)); echo "| $id | ❌ выжил |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Мутант $id выжил -- тесты не ловят этот дефект"
+            fi
+          done
+          total=$((killed+survived))
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Mutation score: $killed / $total**" >> "$GITHUB_STEP_SUMMARY"
+          [ "$total" -gt 0 ] && [ "$survived" -eq 0 ]
+
+  # ---------- Диагностический прогон ----------
+  diag-build:
+    if: inputs.check == 'diagnostics'
+    uses: ./.github/workflows/_unity-build.yml
+    with:
+      target: StandaloneLinux64
+      retention-days: 3
+    secrets: inherit
+
+  diag-run:
+    needs: diag-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.diag-build.outputs.artifact }}
+          path: game
+      - name: Запуск игры в диагностическом режиме
+        run: |
+          exe=$(find game -maxdepth 1 -type f -name 'BeerAndDragon*' ! -name '*.so' ! -name '*.debug' | head -1)
+          chmod +x "$exe"
+          set +e
+          timeout 300 "$exe" -batchmode -nographics -diag -ciSmoke "${{ inputs.seconds }}" \
+            -diagReport "$PWD/diag-report.json" -logFile "$PWD/player.log"
+          echo "exit code: $?"
+          set -e
+          cat diag-report.json || true
+          {
+            echo "## Диагностический прогон"; echo '```json'; cat diag-report.json 2>/dev/null; echo '```'
+            echo "### Последние строки журнала"; echo '```'; grep -E '\[(INFO|WARN|ERROR|DEBUG)\]' player.log | tail -40; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagnostics-${{ github.run_id }}
+          path: |
+            diag-report.json
+            player.log

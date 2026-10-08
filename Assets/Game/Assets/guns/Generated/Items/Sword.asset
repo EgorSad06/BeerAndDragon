@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1231f5933a5ba6545a31cce284f02076, type: 3}
+  m_Name: Sword
+  m_EditorClassIdentifier: Assembly-CSharp::ItemDefinition
+  displayName: "\u041C\u0435\u0447"
+  description: "\u0417\u0430\u0436\u043C\u0438 \u041B\u041A\u041C -- \u0442\u044F\u0436\u0451\u043B\u044B\u0439
+    \u0443\u0434\u0430\u0440. \u0423\u0434\u0430\u0440 \u0432\u043D\u0438\u0437 \u0432
+    \u0432\u043E\u0437\u0434\u0443\u0445\u0435 -- \u043F\u043E\u0433\u043E-\u043F\u0440\u044B\u0436\u043E\u043A."
+  icon: {fileID: 21300000, guid: 81c4d35b899a1534295d34d2aa848875, type: 3}
+  kind: 0
+  maxStack: 1
+  weaponObjectName: Sword
+  effect: 0
+  amount: 25
+  duration: 0
+  useSound: {fileID: 0}

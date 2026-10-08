@@ -1,0 +1,31 @@
+# Repository / PR checks: быстрые проверки текущего состояния проекта на каждый PR
+# и каждый пуш в рабочие ветки (не main). Сборки артефакта здесь нет -- только
+# компиляция + быстрые тесты + lint/static analysis.
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main, release]
+  push:
+    branches-ignore: [main]
+    tags-ignore: ["**"]
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    secrets: inherit
+
+  unity-tests:
+    needs: checks
+    uses: ./.github/workflows/_unity-tests.yml
+    with:
+      require-license: false
+    secrets: inherit

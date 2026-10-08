@@ -105,3 +105,17 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# --- добавлено для CI ---
+# Решение Visual Studio нового формата генерируется Unity
+*.slnx
+# Сцены автосохранения после крэша редактора
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
+# Локальные отчёты CI-скриптов
+/build/
+# Бэкапы Blender и служебные файлы Unreal из скачанных паков
+*.blend1
+*.blend1.meta
+**/Unreal Engine 5 Project/Saved/Logs/
+**/Unreal Engine 5 Project/Saved/Crashes/

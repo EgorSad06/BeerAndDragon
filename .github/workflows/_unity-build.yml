@@ -1,0 +1,91 @@
+# Переиспользуемая сборка игры (GameCI) + сохранение артефакта.
+name: _unity-build
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: "StandaloneWindows64 / StandaloneLinux64"
+        type: string
+        required: true
+      version:
+        description: "Версия сборки (пусто -- семантическая из git-тегов)"
+        type: string
+        default: ""
+      retention-days:
+        type: number
+        default: 14
+    secrets:
+      UNITY_LICENSE:
+        required: true
+      UNITY_EMAIL:
+        required: false
+      UNITY_PASSWORD:
+        required: false
+    outputs:
+      artifact:
+        value: ${{ jobs.build.outputs.artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      artifact: ${{ steps.name.outputs.artifact }}
+    steps:
+      # Docker-образ Unity большой -- освобождаем место на раннере
+      - uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          tool-cache: false
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # для семантической версии из тегов
+          lfs: false
+
+      - name: Список LFS-файлов (ключ кэша)
+        run: git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+      - name: git lfs pull
+        run: git lfs pull
+
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ inputs.target }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ inputs.target }}-
+
+      - name: Unity build
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: ${{ inputs.target }}
+          buildName: BeerAndDragon
+          versioning: ${{ inputs.version != '' && 'Custom' || 'Semantic' }}
+          version: ${{ inputs.version }}
+
+      - name: Имя артефакта
+        id: name
+        run: echo "artifact=BeerAndDragon-${{ inputs.target }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: build/${{ inputs.target }}
+          retention-days: ${{ inputs.retention-days }}
+          if-no-files-found: error

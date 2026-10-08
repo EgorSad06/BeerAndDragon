@@ -1,0 +1,38 @@
+# Переиспользуемые быстрые проверки (без Unity и без лицензии): ~1 минута.
+# Вызываются из PR, main и release.
+name: _checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  repo-checks:
+    name: Repo checks + lint + secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # для gitleaks нужна история
+          lfs: false       # LFS-файлы не качаем: проверкам хватает указателей
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Структура репозитория (.meta, GUID, LFS, служебные файлы)
+        run: python ci/check_repo.py
+
+      - name: Статический анализ C#
+        run: python ci/lint_cs.py
+
+      - name: Засеянные дефекты актуальны (строки для мутаций есть в коде)
+        run: python ci/apply_mutation.py --check-all
+
+      - name: Поиск секретов в репозитории (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
