@@ -42,6 +42,20 @@
       "find": "float angle = Mathf.Sqrt(Random.value) * coneAngle * Mathf.Deg2Rad;",
       "replace": "float angle = Mathf.Sqrt(Random.value) * coneAngle * 2f * Mathf.Deg2Rad;",
       "what": "дробь вылетает за пределы конуса разброса"
+    },
+    {
+      "id": "pool-recycles-newest",
+      "file": "Assets/Game/Scripts/Core/BoundedPool.cs",
+      "find": "if (pair.Value < best) { best = pair.Value; oldest = pair.Key; }",
+      "replace": "if (pair.Value > best || best == long.MaxValue) { best = pair.Value; oldest = pair.Key; }",
+      "what": "при переполнении пул забирает самый новый объект (только что поставленная дырка от пули исчезает)"
+    },
+    {
+      "id": "pool-double-release",
+      "file": "Assets/Game/Scripts/Core/BoundedPool.cs",
+      "find": "if (!active.Remove(item)) throw new InvalidOperationException(\"Объект уже возвращён в пул\");",
+      "replace": "active.Remove(item);",
+      "what": "повторный возврат не обнаруживается -- один объект окажется в пуле дважды"
     }
   ]
 }
