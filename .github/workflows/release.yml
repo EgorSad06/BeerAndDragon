@@ -27,7 +27,6 @@ env:
 
 permissions:
   contents: read
-  pull-requests: read   # gitleaks в PR читает список коммитов через API
   checks: write
 
 jobs:

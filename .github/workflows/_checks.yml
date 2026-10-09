@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read   # gitleaks в PR читает список коммитов через API
 
 jobs:
   repo-checks:
@@ -33,7 +32,11 @@ jobs:
       - name: Засеянные дефекты актуальны (строки для мутаций есть в коде)
         run: python ci/apply_mutation.py --check-all
 
+      # gitleaks CLI напрямую (без gitleaks-action): работает одинаково в push и PR,
+      # не ходит в GitHub API и не требует лишних прав. Сканирует всю историю.
       - name: Поиск секретов в репозитории (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.21.2"
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --verbose --no-banner
