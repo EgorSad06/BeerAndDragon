@@ -99,7 +99,8 @@ jobs:
           if [ "${{ steps.license.outputs.ok }}" != "true" ]; then echo "outcome=skipped" >> "$GITHUB_OUTPUT"; exit 0; fi
           echo "outcome=${{ steps.unity.outcome }}" >> "$GITHUB_OUTPUT"
           # Явный исход прогона: нужен для подсчёта мутантов (при ошибке компиляции XML с тестами нет)
-          mkdir -p test-results && echo "${{ steps.unity.outcome }}" > test-results/outcome.txt
+          # test-results создаёт Docker-контейнер Unity от root -- пишем через sudo
+          sudo mkdir -p test-results && echo "${{ steps.unity.outcome }}" | sudo tee test-results/outcome.txt > /dev/null
 
       - uses: actions/upload-artifact@v4
         if: always() && steps.license.outputs.ok == 'true'
