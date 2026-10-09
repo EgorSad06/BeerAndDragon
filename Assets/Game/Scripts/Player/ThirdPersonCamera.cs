@@ -12,7 +12,7 @@ public class ThirdPersonCamera : MonoBehaviour
     public float height = 0.9f;
     public float shoulderOffset = 0.6f;     // камера чуть правее -- рыцарь не закрывает прицел
 
-    public Movment look;                    // найдётся сам
+    public CameraPOV look;                    // найдётся сам
     public SkaterController skater;         // найдётся сам
     public Transform weaponHolder;          // найдётся сам
 
@@ -22,7 +22,7 @@ public class ThirdPersonCamera : MonoBehaviour
 
     void Awake()
     {
-        if (look == null) look = GetComponentInChildren<Movment>();
+        if (look == null) look = GetComponentInChildren<CameraPOV>();
         if (skater == null) skater = GetComponent<SkaterController>();
         if (weaponHolder == null)
         {

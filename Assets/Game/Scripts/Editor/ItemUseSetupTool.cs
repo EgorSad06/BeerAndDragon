@@ -16,10 +16,10 @@ public static class ItemUseSetupTool
     [MenuItem("Tools/BeerAndDragon/Setup Item Use Animations")]
     public static void Setup()
     {
-        KnightMovment player = Object.FindFirstObjectByType<KnightMovment>();
+        KnightMovement player = Object.FindFirstObjectByType<KnightMovement>();
         if (player == null)
         {
-            Debug.LogWarning("[ItemUse] В сцене нет игрока (KnightMovment).");
+            Debug.LogWarning("[ItemUse] В сцене нет игрока (KnightMovement).");
             return;
         }
         G.EnsureFolder(G.PrefabsDir);

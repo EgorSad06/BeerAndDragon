@@ -68,7 +68,7 @@ public static class SkateSetupTool
     public static void SetupSkateboard()
     {
         if (!CheckScene()) return;
-        KnightMovment player = Object.FindFirstObjectByType<KnightMovment>();
+        KnightMovement player = Object.FindFirstObjectByType<KnightMovement>();
         Physics.SyncTransforms();
 
         G.EnsureFolder(G.PrefabsDir);
@@ -308,8 +308,8 @@ public static class SkateSetupTool
 
     static bool CheckScene()
     {
-        if (Object.FindFirstObjectByType<KnightMovment>() != null) return true;
-        Debug.LogWarning("[BeerAndDragon] В открытой сцене нет игрока (KnightMovment) -- открой SampleScene.");
+        if (Object.FindFirstObjectByType<KnightMovement>() != null) return true;
+        Debug.LogWarning("[BeerAndDragon] В открытой сцене нет игрока (KnightMovement) -- открой SampleScene.");
         return false;
     }
 
@@ -355,7 +355,7 @@ static class PendingSceneSetup
             EditorApplication.delayCall += TryRun;
             return;
         }
-        if (Object.FindFirstObjectByType<KnightMovment>() == null) return; // не та сцена -- ждём следующей перекомпиляции
+        if (Object.FindFirstObjectByType<KnightMovement>() == null) return; // не та сцена -- ждём следующей перекомпиляции
 
         string tasks = File.ReadAllText(Marker);
         File.Delete(Marker);

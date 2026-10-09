@@ -14,7 +14,7 @@ public class ItemUser : MonoBehaviour
     public Inventory inventory;
     public PlayerHealth health;
     public WeaponSwitcher weaponSwitcher;
-    public Movment look;
+    public CameraPOV look;
     public SkaterController skater;
     public ThirdPersonCamera thirdPersonCamera;
     public KnightAnimator knight;
@@ -58,7 +58,7 @@ public class ItemUser : MonoBehaviour
         if (inventory == null) inventory = GetComponent<Inventory>();
         if (health == null) health = GetComponent<PlayerHealth>();
         if (weaponSwitcher == null) weaponSwitcher = GetComponentInChildren<WeaponSwitcher>(true);
-        if (look == null) look = GetComponentInChildren<Movment>();
+        if (look == null) look = GetComponentInChildren<CameraPOV>();
         if (skater == null) skater = GetComponent<SkaterController>();
         if (thirdPersonCamera == null) thirdPersonCamera = GetComponent<ThirdPersonCamera>();
         if (knight == null) knight = GetComponentInChildren<KnightAnimator>();

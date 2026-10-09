@@ -13,10 +13,10 @@ public class KnightAnimator : MonoBehaviour
 {
     [Header("Refs (найдутся сами)")]
     public Rigidbody body;
-    public KnightMovment movement;
+    public KnightMovement movement;
     public SkaterController skater;
     public WallClimb wallClimb;
-    public WallRun wallRun;
+    public WallRunSurface wallRun;
     public WeaponSwitcher weaponSwitcher;
     public PlayerHealth health;
     public ItemUser itemUser;
@@ -103,16 +103,16 @@ public class KnightAnimator : MonoBehaviour
     {
         Transform player = transform.root;
         if (body == null) body = player.GetComponent<Rigidbody>();
-        if (movement == null) movement = player.GetComponent<KnightMovment>();
+        if (movement == null) movement = player.GetComponent<KnightMovement>();
         if (skater == null) skater = player.GetComponent<SkaterController>();
         if (wallClimb == null) wallClimb = player.GetComponent<WallClimb>();
-        if (wallRun == null) wallRun = player.GetComponent<WallRun>();
+        if (wallRun == null) wallRun = player.GetComponent<WallRunSurface>();
         if (weaponSwitcher == null) weaponSwitcher = player.GetComponentInChildren<WeaponSwitcher>(true);
         if (health == null) health = player.GetComponent<PlayerHealth>();
         if (itemUser == null) itemUser = player.GetComponent<ItemUser>();
         if (viewCamera == null)
         {
-            Movment look = player.GetComponentInChildren<Movment>();
+            CameraPOV look = player.GetComponentInChildren<CameraPOV>();
             if (look != null) viewCamera = look.transform;
         }
 
@@ -182,7 +182,7 @@ public class KnightAnimator : MonoBehaviour
         ApplyDeath(dt);
     }
 
-    // KnightMovment при приседании сжимает Model по Y -- рыцаря не плющим, приседание рисуем позой
+    // KnightMovement при приседании сжимает Model по Y -- рыцаря не плющим, приседание рисуем позой
     private void KeepScaleAgainstParent()
     {
         Transform p = transform.parent;
@@ -244,7 +244,7 @@ public class KnightAnimator : MonoBehaviour
             return p;
         }
 
-        KnightMovment.MovementState state = movement != null ? movement.state : KnightMovment.MovementState.walking;
+        KnightMovement.MovementState state = movement != null ? movement.state : KnightMovement.MovementState.walking;
         bool grounded = movement == null || movement.IsGrounded();
         bool wallRunning = wallRun != null && wallRun.IsRunning;
 
@@ -254,7 +254,7 @@ public class KnightAnimator : MonoBehaviour
             p.bodyPitch += 8f;
             p.armOutL += 25f; p.armOutR += 25f;
         }
-        else if (state == KnightMovment.MovementState.sliding)
+        else if (state == KnightMovement.MovementState.sliding)
         {
             // Подкат: одна нога вперёд, корпус назад
             p.bodyPitch = -25f; p.bodyDrop = 0.45f;
@@ -274,7 +274,7 @@ public class KnightAnimator : MonoBehaviour
             p.elbowL = 30f; p.elbowR = 30f;
             p.bodyPitch = 5f - fall * 10f;
         }
-        else if (state == KnightMovment.MovementState.croaching)
+        else if (state == KnightMovement.MovementState.croaching)
         {
             p = RunCycle(p, speed, dt, 0.6f);
             p.bodyDrop = 0.4f; p.bodyPitch += 15f;

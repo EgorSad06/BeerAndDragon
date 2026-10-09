@@ -1,10 +1,10 @@
 using UnityEngine;
 
 // Временные эффекты на игроке. Пока только ускорение от энергетика:
-// умножает скорости KnightMovment и слегка расширяет FOV.
+// умножает скорости KnightMovement и слегка расширяет FOV.
 public class PlayerStatusEffects : MonoBehaviour
 {
-    public KnightMovment movement;          // найдётся сам
+    public KnightMovement movement;          // найдётся сам
     public Camera playerCamera;             // найдётся сам
     public float boostFovAdd = 12f;
     public float fovLerpSpeed = 6f;
@@ -19,7 +19,7 @@ public class PlayerStatusEffects : MonoBehaviour
 
     void Awake()
     {
-        if (movement == null) movement = GetComponent<KnightMovment>();
+        if (movement == null) movement = GetComponent<KnightMovement>();
         if (playerCamera == null) playerCamera = GetComponentInChildren<Camera>();
 
         if (movement != null)

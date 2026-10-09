@@ -11,7 +11,7 @@ public class WeaponSway : MonoBehaviour
 
     [Header("Bob (от ходьбы)")]
     public Rigidbody playerBody;            // найдётся сам
-    public KnightMovment movement;          // найдётся сам
+    public KnightMovement movement;          // найдётся сам
     public float bobFrequency = 1.4f;       // шагов на метр скорости... примерно
     public float bobAmountX = 0.015f;
     public float bobAmountY = 0.02f;
@@ -29,7 +29,7 @@ public class WeaponSway : MonoBehaviour
 
         Transform root = transform.root;
         if (playerBody == null) playerBody = root.GetComponent<Rigidbody>();
-        if (movement == null) movement = root.GetComponent<KnightMovment>();
+        if (movement == null) movement = root.GetComponent<KnightMovement>();
     }
 
     void Update()

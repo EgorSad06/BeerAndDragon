@@ -1,5 +1,10 @@
 # BeerAndDragon
 
+[![PR checks](https://github.com/EgorSad06/BeerAndDragon/actions/workflows/pr.yml/badge.svg)](https://github.com/EgorSad06/BeerAndDragon/actions/workflows/pr.yml)
+[![Main pipeline](https://github.com/EgorSad06/BeerAndDragon/actions/workflows/main.yml/badge.svg)](https://github.com/EgorSad06/BeerAndDragon/actions/workflows/main.yml)
+[![Release Gate](https://github.com/EgorSad06/BeerAndDragon/actions/workflows/release.yml/badge.svg)](https://github.com/EgorSad06/BeerAndDragon/actions/workflows/release.yml)
+![Unity](https://img.shields.io/badge/Unity-6000.3.0f1-black?logo=unity)
+
 Шутер от первого лица в духе ULTRAKILL со средневековым сеттингом и юмором: рыцарь с дробовиком и мечом,
 лечится сигаретами, ускоряется энергетиком и катается на скейте с трюками. Unity 6 (6000.3.0f1), URP.
 

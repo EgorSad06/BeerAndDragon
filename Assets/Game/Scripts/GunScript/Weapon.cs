@@ -20,7 +20,7 @@ public interface IDamageable
 //                            происходило само по таймеру, без отдельной кнопки.
 //
 // Иерархия, под которую рассчитан скрипт (её собирает Tools > BeerAndDragon > Setup Player Weapons):
-//   PlayerCam (Camera + Movment)
+//   PlayerCam (Camera + CameraPOV)
 //     WeaponHolder (WeaponSwitcher, WeaponSway)
 //       Shotgun (Weapon)
 //         Kick        <- recoilTransform, дёргается при выстреле и наклоняется при перезарядке
@@ -61,7 +61,7 @@ public class Weapon : MonoBehaviour
     private float currentSpreadBloom;
 
     [Header("Recoil: камера")]
-    public Movment cameraLook;              // скрипт мыши на PlayerCam; найдётся сам
+    public CameraPOV cameraLook;              // скрипт мыши на PlayerCam; найдётся сам
     public float recoilKickPitch = 3f;      // дёрг камеры вверх за выстрел, градусы
     public Vector2 recoilKickYawRange = new Vector2(-1f, 1f);
 
@@ -158,7 +158,7 @@ public class Weapon : MonoBehaviour
             if (cam == null) cam = Camera.main;
             if (cam != null) aimOrigin = cam.transform;
         }
-        if (cameraLook == null) cameraLook = GetComponentInParent<Movment>();
+        if (cameraLook == null) cameraLook = GetComponentInParent<CameraPOV>();
         if (playerBody == null && owner != null) playerBody = owner.GetComponent<Rigidbody>();
 
         if (recoilTransform != null)

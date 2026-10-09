@@ -14,7 +14,7 @@ public static class SkateSoundsSetupTool
     [MenuItem("Tools/BeerAndDragon/Setup Skate Sounds")]
     public static void Setup()
     {
-        KnightMovment player = Object.FindFirstObjectByType<KnightMovment>();
+        KnightMovement player = Object.FindFirstObjectByType<KnightMovement>();
         if (player == null || player.GetComponent<SkaterController>() == null)
         {
             Debug.LogWarning("[SkateSounds] Нужен игрок со SkaterController -- сначала Tools > BeerAndDragon > Setup Skateboard.");

@@ -56,7 +56,7 @@ public class Sword : MonoBehaviour
     public Transform aimOrigin;
     public Transform owner;
     public Rigidbody playerBody;
-    public KnightMovment movement;
+    public KnightMovement movement;
 
     [Header("SFX / VFX (можно оставить пустым)")]
     public AudioSource audioSource;
@@ -92,7 +92,7 @@ public class Sword : MonoBehaviour
             if (cam != null) aimOrigin = cam.transform;
         }
         if (playerBody == null && owner != null) playerBody = owner.GetComponent<Rigidbody>();
-        if (movement == null && owner != null) movement = owner.GetComponent<KnightMovment>();
+        if (movement == null && owner != null) movement = owner.GetComponent<KnightMovement>();
 
         if (swingPivot != null)
         {

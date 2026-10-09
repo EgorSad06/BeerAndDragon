@@ -3,7 +3,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 
 // Tools > BeerAndDragon > Setup Knight Model
-//   Ставит модель рыцаря на игрока вместо капсулы (в Player/Model, который крутит KnightMovment),
+//   Ставит модель рыцаря на игрока вместо капсулы (в Player/Model, который крутит KnightMovement),
 //   подгоняет рост под капсулу, разворачивает лицом вперёд и вешает KnightAnimator
 //   (процедурные анимации) + ThirdPersonCamera (V -- вид от 3-го лица).
 public static class KnightSetupTool
@@ -14,10 +14,10 @@ public static class KnightSetupTool
     [MenuItem("Tools/BeerAndDragon/Setup Knight Model")]
     public static void SetupKnight()
     {
-        KnightMovment player = Object.FindFirstObjectByType<KnightMovment>();
+        KnightMovement player = Object.FindFirstObjectByType<KnightMovement>();
         if (player == null)
         {
-            Debug.LogWarning("[Knight] В сцене нет игрока (KnightMovment).");
+            Debug.LogWarning("[Knight] В сцене нет игрока (KnightMovement).");
             return;
         }
         GameObject fbx = AssetDatabase.LoadAssetAtPath<GameObject>(KnightFbx);
@@ -41,7 +41,7 @@ public static class KnightSetupTool
         Transform old = model.Find("KnightVisual");
         if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
 
-        Movment look = player.GetComponentInChildren<Movment>(true);
+        CameraPOV look = player.GetComponentInChildren<CameraPOV>(true);
         Transform cam = look != null ? look.transform : null;
 
         // Прячем болванку-капсулу (коллайдер остаётся) и обломки старого меша рыцаря на самом Player

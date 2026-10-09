@@ -37,7 +37,7 @@ public class AmmoPickup : MonoBehaviour
     {
         Inventory inv = other.GetComponentInParent<Inventory>();
         Transform root = inv != null ? inv.transform : other.transform.root;
-        if (root.GetComponent<KnightMovment>() == null && inv == null) return; // не игрок
+        if (root.GetComponent<KnightMovement>() == null && inv == null) return; // не игрок
 
         int taken = 0;
         foreach (Weapon w in root.GetComponentsInChildren<Weapon>(true))

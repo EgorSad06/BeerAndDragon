@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Катание на скейте в духе Tony Hawk's Pro Skater. Висит на игроке (рядом с KnightMovment)
+// Катание на скейте в духе Tony Hawk's Pro Skater. Висит на игроке (рядом с KnightMovement)
 // и пока игрок на доске -- полностью управляет его Rigidbody.
 //
 // Управление (на доске):
@@ -85,8 +85,8 @@ public class SkaterController : MonoBehaviour
     public float camFollowSpeed = 4f;
 
     [Header("Refs (найдутся сами)")]
-    public KnightMovment movement;
-    public Movment look;
+    public KnightMovement movement;
+    public CameraPOV look;
     public Transform model;
     public WeaponSwitcher weaponSwitcher;
     public Inventory inventory;
@@ -191,8 +191,8 @@ public class SkaterController : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        if (movement == null) movement = GetComponent<KnightMovment>();
-        if (look == null) look = GetComponentInChildren<Movment>();
+        if (movement == null) movement = GetComponent<KnightMovement>();
+        if (look == null) look = GetComponentInChildren<CameraPOV>();
         if (model == null && movement != null) model = movement.model;
         if (weaponSwitcher == null) weaponSwitcher = GetComponentInChildren<WeaponSwitcher>(true);
         if (inventory == null) inventory = GetComponent<Inventory>();
@@ -220,7 +220,7 @@ public class SkaterController : MonoBehaviour
             // Всё, что само крутит скорость игрока, на доске должно молчать
             if (movement != null) disableWhileRiding.Add(movement);
             foreach (WallClimb w in GetComponents<WallClimb>()) disableWhileRiding.Add(w);
-            foreach (WallRun w in GetComponents<WallRun>()) disableWhileRiding.Add(w);
+            foreach (WallRunSurface w in GetComponents<WallRunSurface>()) disableWhileRiding.Add(w);
         }
     }
 

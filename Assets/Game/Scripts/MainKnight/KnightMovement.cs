@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using TMPro; 
 
-public class KnightMovment : MonoBehaviour
+public class KnightMovement : MonoBehaviour
 {
     [Header("Movement")]
     private float moveSpeed;

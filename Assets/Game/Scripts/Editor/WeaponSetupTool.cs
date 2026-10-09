@@ -36,11 +36,11 @@ public static class WeaponSetupTool
     [MenuItem("Tools/BeerAndDragon/Setup Player")]
     public static void SetupPlayer()
     {
-        KnightMovment player = Object.FindFirstObjectByType<KnightMovment>();
-        Movment look = Object.FindFirstObjectByType<Movment>();
+        KnightMovement player = Object.FindFirstObjectByType<KnightMovement>();
+        CameraPOV look = Object.FindFirstObjectByType<CameraPOV>();
         if (player == null || look == null)
         {
-            EditorUtility.DisplayDialog("Setup Player", "Не нашёл KnightMovment или Movment (скрипт камеры) в открытой сцене.", "Ок");
+            EditorUtility.DisplayDialog("Setup Player", "Не нашёл KnightMovement или CameraPOV (скрипт камеры) в открытой сцене.", "Ок");
             return;
         }
 
@@ -132,7 +132,7 @@ public static class WeaponSetupTool
 
     // ---------------- Weapons ----------------
 
-    static AudioSource SetupWeapons(KnightMovment player, Movment look)
+    static AudioSource SetupWeapons(KnightMovement player, CameraPOV look)
     {
         Camera cam = look.GetComponent<Camera>();
         Transform camT = look.transform;
@@ -165,7 +165,7 @@ public static class WeaponSetupTool
         return audio;
     }
 
-    static void BuildShotgun(Transform holder, Transform camT, KnightMovment player, Movment look, AudioSource audio)
+    static void BuildShotgun(Transform holder, Transform camT, KnightMovement player, CameraPOV look, AudioSource audio)
     {
         Material gunMat = G.Material("M_DoubleBarrel", G.Lit, Color.white, AssetDatabase.LoadAssetAtPath<Texture2D>(ShotgunTex));
         Material shellMat = G.Material("M_Shell", G.Lit, Color.white, AssetDatabase.LoadAssetAtPath<Texture2D>(ShellTex));
@@ -311,7 +311,7 @@ public static class WeaponSetupTool
         return null;
     }
 
-    static void BuildSword(Transform holder, Transform camT, KnightMovment player, AudioSource audio)
+    static void BuildSword(Transform holder, Transform camT, KnightMovement player, AudioSource audio)
     {
         Material steel = G.Material("M_SwordSteel", G.Lit, new Color(0.78f, 0.8f, 0.85f), null, 0.9f, 0.65f);
         Material gold = G.Material("M_SwordGold", G.Lit, new Color(0.85f, 0.62f, 0.2f), null, 1f, 0.5f);
@@ -345,7 +345,7 @@ public static class WeaponSetupTool
         return c != null ? c : Undo.AddComponent<T>(go);
     }
 
-    static void SetupPlayerComponents(KnightMovment player, Items items, AudioSource audio)
+    static void SetupPlayerComponents(KnightMovement player, Items items, AudioSource audio)
     {
         GameObject go = player.gameObject;
         GetOrAdd<PlayerHealth>(go);
@@ -455,7 +455,7 @@ public static class WeaponSetupTool
     [MenuItem("Tools/BeerAndDragon/Spawn Test Stuff")]
     public static void SpawnTestStuff()
     {
-        KnightMovment player = Object.FindFirstObjectByType<KnightMovment>();
+        KnightMovement player = Object.FindFirstObjectByType<KnightMovement>();
         Vector3 origin = player != null ? player.transform.position : Vector3.zero;
         Vector3 fwd = player != null && player.orientation != null ? player.orientation.forward : Vector3.forward;
         fwd.y = 0f;

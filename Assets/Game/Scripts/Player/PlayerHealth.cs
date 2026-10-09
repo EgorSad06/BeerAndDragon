@@ -69,7 +69,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         GameLog.Info("Player", "Игрок погиб, перезапуск сцены через " + restartDelay + " с");
         PlayerInputLock.Locked = true;
 
-        KnightMovment movement = GetComponent<KnightMovment>();
+        KnightMovement movement = GetComponent<KnightMovement>();
         if (movement != null) movement.enabled = false;
 
         Died?.Invoke();
