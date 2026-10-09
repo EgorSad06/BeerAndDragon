@@ -1,0 +1,11 @@
+# Настройки gitleaks (CI: .github/workflows/_checks.yml). Правила -- стандартные.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Сторонние файлы без наших секретов"
+paths = [
+  # Unreal-проект внутри скачанного пака PS1 Cans: SecurityToken и ключи ввода в .ini --
+  # служебные значения чужого проекта, к нашим сервисам не относятся.
+  '''Unreal Engine 5 Project/''',
+]

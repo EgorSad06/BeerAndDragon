@@ -27,7 +27,7 @@ public class WallClimb : MonoBehaviour
     public float reGrabCooldown = 0.3f;
 
     [Header("Refs")]
-    public KnightMovment movement;
+    public KnightMovement movement;
 
     private Rigidbody rb;
     private bool isClinging;

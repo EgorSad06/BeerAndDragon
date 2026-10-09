@@ -1,0 +1,182 @@
+# Release Gate: проверки, необходимые для конкретного релиз-кандидата.
+# Запуск: пуш тега vX.Y.Z (например, git tag v0.1.0 && git push origin v0.1.0)
+#         или вручную (Actions -> Release Gate -> Run workflow) -- тогда без публикации релиза.
+#
+# Gate:
+#  1. Быстрые проверки + поиск секретов по всей истории (защитная мера №1).
+#  2. Обязательные тесты (EditMode).
+#  3. Пакет: сборка Windows (поставка) + Linux (для smoke-запуска на CI) -> zip + SHA-256.
+#  4. "Установка": распаковка в чистую папку, проверка состава и контрольных сумм (защитная мера №2).
+#  5. Эксплуатационное измерение: smoke-запуск игры, время загрузки сцены, FPS, ошибки -- с порогами.
+#  6. Анализ состава поставки: SBOM (CycloneDX) + список лицензий сторонних ассетов.
+name: Release Gate
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия релиз-кандидата (например 0.1.0-rc1)"
+        required: true
+        default: "0.1.0-rc1"
+
+env:
+  MAX_STARTUP_SECONDS: "30"   # порог: сцена должна загрузиться быстрее
+  MAX_ERRORS: "0"             # порог: ошибок в журнале за время smoke-прогона
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.v.outputs.value }}
+    steps:
+      - id: v
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.version }}"; fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+          echo "Релиз-кандидат: **$v**" >> "$GITHUB_STEP_SUMMARY"
+
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    secrets: inherit
+
+  unity-tests:
+    needs: checks
+    uses: ./.github/workflows/_unity-tests.yml
+    with:
+      require-license: true
+    secrets: inherit
+
+  build-windows:
+    needs: [version, unity-tests]
+    uses: ./.github/workflows/_unity-build.yml
+    with:
+      target: StandaloneWindows64
+      version: ${{ needs.version.outputs.value }}
+      retention-days: 30
+    secrets: inherit
+
+  build-linux:
+    needs: [version, unity-tests]
+    uses: ./.github/workflows/_unity-build.yml
+    with:
+      target: StandaloneLinux64
+      version: ${{ needs.version.outputs.value }}
+      retention-days: 7
+    secrets: inherit
+
+  gate:
+    name: Release gate
+    needs: [version, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-windows.outputs.artifact }}
+          path: dist/win
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-linux.outputs.artifact }}
+          path: dist/linux
+
+      - name: "Пакет: zip + SHA-256"
+        run: |
+          mkdir -p release
+          (cd dist/win && zip -qr "../../release/BeerAndDragon-$VERSION-win64.zip" .)
+          (cd dist/linux && zip -qr "../../release/BeerAndDragon-$VERSION-linux64.zip" .)
+          (cd release && sha256sum *.zip > SHA256SUMS.txt)
+          cat release/SHA256SUMS.txt
+          ls -lh release
+
+      - name: "Установка: распаковка в чистую папку + проверка"
+        run: |
+          set -e
+          (cd release && sha256sum -c SHA256SUMS.txt)          # целостность пакетов
+          rm -rf /tmp/install && mkdir -p /tmp/install/win /tmp/install/linux
+          unzip -q "release/BeerAndDragon-$VERSION-win64.zip" -d /tmp/install/win
+          unzip -q "release/BeerAndDragon-$VERSION-linux64.zip" -d /tmp/install/linux
+          for f in BeerAndDragon.exe UnityPlayer.dll BeerAndDragon_Data; do
+            [ -e "/tmp/install/win/$f" ] || { echo "::error::В Windows-пакете нет $f"; exit 1; }
+          done
+          [ -d /tmp/install/linux/BeerAndDragon_Data ] || { echo "::error::В Linux-пакете нет BeerAndDragon_Data"; exit 1; }
+          size=$(du -sm /tmp/install/win | cut -f1)
+          echo "Размер установленной Windows-версии: ${size} МБ" | tee -a "$GITHUB_STEP_SUMMARY"
+          # В релизе не должно быть отладочных символов и dev-сборки
+          if find /tmp/install/win -iname '*.pdb' | grep -q .; then echo "::warning::В поставке есть .pdb-файлы"; fi
+
+      - name: "Эксплуатационное измерение: smoke-запуск"
+        run: |
+          exe=$(find /tmp/install/linux -maxdepth 1 -type f -name 'BeerAndDragon*' ! -name '*.so' ! -name '*.debug' | head -1)
+          chmod +x "$exe"
+          set +e
+          timeout 300 "$exe" -batchmode -nographics -ciSmoke 10 -diagReport "$PWD/smoke-report.json" -logFile "$PWD/smoke-player.log"
+          code=$?
+          set -e
+          echo "exit code: $code"
+          [ -f smoke-report.json ] || { echo "::error::Игра не дошла до отчёта (крэш/зависание, код $code)"; tail -50 smoke-player.log; exit 1; }
+          cat smoke-report.json
+          python3 - <<'PY'
+          import json, os, sys
+          r = json.load(open("smoke-report.json"))
+          max_t, max_e = float(os.environ["MAX_STARTUP_SECONDS"]), int(os.environ["MAX_ERRORS"])
+          ok_t, ok_e = r["firstSceneLoadedSeconds"] <= max_t, r["errors"] <= max_e
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as s:
+              s.write("## Smoke-запуск\n| Метрика | Значение | Порог |\n|---|---|---|\n")
+              s.write(f"| Загрузка сцены | {r['firstSceneLoadedSeconds']} с | ≤ {max_t} с {'✅' if ok_t else '❌'} |\n")
+              s.write(f"| Ошибок в журнале | {r['errors']} | ≤ {max_e} {'✅' if ok_e else '❌'} |\n")
+              s.write(f"| Кадров / средний FPS (без GPU) | {r['framesRendered']} / {r['avgFps']} | -- |\n")
+          if not (ok_t and ok_e):
+              print("::error::Smoke-запуск не прошёл пороги"); sys.exit(1)
+          PY
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: "Анализ состава поставки (SBOM)"
+        run: |
+          python ci/sbom.py --version "$VERSION" --out release
+          cat release/sbom.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate-${{ env.VERSION }}
+          path: |
+            release
+            smoke-report.json
+            smoke-player.log
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub Release
+    needs: [version, gate]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-candidate-${{ needs.version.outputs.value }}
+          path: rc
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: BeerAndDragon ${{ needs.version.outputs.value }}
+          body_path: rc/release/sbom.md
+          files: |
+            rc/release/*.zip
+            rc/release/SHA256SUMS.txt
+            rc/release/sbom.cdx.json
+            rc/smoke-report.json

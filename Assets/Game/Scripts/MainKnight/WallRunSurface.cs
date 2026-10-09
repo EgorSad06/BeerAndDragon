@@ -15,7 +15,7 @@ using UnityEngine;
 // Точка отцепления всегда чуть раньше физического конца стены (на endMargin),
 // чтобы бег выглядел аккуратно и не срывал персонажа с самого края.
 [RequireComponent(typeof(Rigidbody))]
-public class WallRun : MonoBehaviour
+public class WallRunSurface : MonoBehaviour
 {
     [Header("Wall detection")]
     public LayerMask wallRunLayer;           // слой стен с автобегом
@@ -38,7 +38,7 @@ public class WallRun : MonoBehaviour
     public float reTriggerCooldown = 0.4f;
 
     [Header("Refs")]
-    public KnightMovment movement;
+    public KnightMovement movement;
     public WallClimb wallClimb;              // необязательно -- на время бега тоже отключается
 
     private Rigidbody rb;

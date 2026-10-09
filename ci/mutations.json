@@ -1,0 +1,61 @@
+{
+  "description": "Засеянные дефекты (seeded defects) для проверки качества набора тестов. Каждый мутант -- одна замена в коде. Набор тестов хороший, если КАЖДЫЙ мутант 'убит' (хотя бы один тест упал).",
+  "mutants": [
+    {
+      "id": "falloff-inverted",
+      "file": "Assets/Game/Scripts/GunScript/Weapon.cs",
+      "find": "return Mathf.Lerp(1f, minMultiplier, Mathf.InverseLerp(start, end, distance));",
+      "replace": "return Mathf.Lerp(minMultiplier, 1f, Mathf.InverseLerp(start, end, distance));",
+      "what": "урон с дистанцией растёт, а не падает"
+    },
+    {
+      "id": "stack-overflow",
+      "file": "Assets/Game/Scripts/Items/Inventory.cs",
+      "find": "int put = Mathf.Min(max - s.count, left);",
+      "replace": "int put = Mathf.Min(max - s.count + 1, left);",
+      "what": "при докладывании стопка переполняется на 1 сверх maxStack"
+    },
+    {
+      "id": "damage-halved",
+      "file": "Assets/Game/Scripts/Player/PlayerHealth.cs",
+      "find": "Health = Mathf.Max(0f, Health - amount);",
+      "replace": "Health = Mathf.Max(0f, Health - amount * 0.5f);",
+      "what": "игрок получает только половину урона"
+    },
+    {
+      "id": "rail-no-clamp",
+      "file": "Assets/Game/Scripts/Skate/GrindRail.cs",
+      "find": "t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Mathf.Max(0.0001f, ab.sqrMagnitude));",
+      "replace": "t = Vector3.Dot(p - a, ab) / Mathf.Max(0.0001f, ab.sqrMagnitude);",
+      "what": "грайнд продолжается за концами перил"
+    },
+    {
+      "id": "ammo-no-cap",
+      "file": "Assets/Game/Scripts/GunScript/Weapon.cs",
+      "find": "int take = Mathf.Min(amount, Mathf.Max(0, maxReserveAmmo - reserveAmmo));",
+      "replace": "int take = amount;",
+      "what": "коробки патронов игнорируют максимум запаса"
+    },
+    {
+      "id": "spread-too-wide",
+      "file": "Assets/Game/Scripts/GunScript/Weapon.cs",
+      "find": "float angle = Mathf.Sqrt(Random.value) * coneAngle * Mathf.Deg2Rad;",
+      "replace": "float angle = Mathf.Sqrt(Random.value) * coneAngle * 2f * Mathf.Deg2Rad;",
+      "what": "дробь вылетает за пределы конуса разброса"
+    },
+    {
+      "id": "pool-recycles-newest",
+      "file": "Assets/Game/Scripts/Core/BoundedPool.cs",
+      "find": "if (pair.Value < best) { best = pair.Value; oldest = pair.Key; }",
+      "replace": "if (pair.Value > best || best == long.MaxValue) { best = pair.Value; oldest = pair.Key; }",
+      "what": "при переполнении пул забирает самый новый объект (только что поставленная дырка от пули исчезает)"
+    },
+    {
+      "id": "pool-double-release",
+      "file": "Assets/Game/Scripts/Core/BoundedPool.cs",
+      "find": "if (!active.Remove(item)) throw new InvalidOperationException(\"Объект уже возвращён в пул\");",
+      "replace": "active.Remove(item);",
+      "what": "повторный возврат не обнаруживается -- один объект окажется в пуле дважды"
+    }
+  ]
+}

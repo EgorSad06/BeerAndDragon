@@ -1,0 +1,14 @@
+{
+  "name": "beeranddragon-codemap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Живая карта кода Unity-проекта: граф классов, связей, сцен и статистика",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js --open",
+    "serve": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

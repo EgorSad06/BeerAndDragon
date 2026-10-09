@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodeMap · BeerAndDragon</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='9' cy='9' r='5' fill='%23f2a93b'/><circle cx='23' cy='12' r='4' fill='%2357c7ff'/><circle cx='14' cy='24' r='5' fill='%239b7bff'/><path d='M9 9L23 12L14 24Z' fill='none' stroke='%23cfd6e4' stroke-width='1.5'/></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><circle cx="9" cy="9" r="5" fill="#f2a93b"/><circle cx="23" cy="12" r="4" fill="#57c7ff"/><circle cx="14" cy="24" r="5" fill="#9b7bff"/><path d="M9 9L23 12L14 24Z" fill="none" stroke="#cfd6e4" stroke-width="1.5"/></svg>
+      <span>CodeMap</span><span class="muted" id="projectName">·</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="graph" role="tab">Граф</button>
+      <button class="tab" data-view="stats" role="tab">Статистика</button>
+    </nav>
+    <div class="search">
+      <input id="search" type="search" placeholder="Поиск класса, метода, файла…  ( / )" autocomplete="off">
+      <div id="searchResults" class="search-results" hidden></div>
+    </div>
+    <div class="top-actions">
+      <button id="btnFit" class="icon-btn" title="Показать всё (F)">⤢</button>
+      <button id="btnFreeze" class="icon-btn" title="Заморозить/разморозить раскладку (Space)">❄</button>
+      <button id="btnRescan" class="icon-btn" title="Пересканировать">⟳</button>
+      <button id="btnFeed" class="icon-btn" title="Лента изменений">☰<span id="feedBadge" class="badge" hidden>0</span></button>
+      <div id="live" class="live" title="Живое обновление"><span class="dot"></span><span id="liveText">подключение…</span></div>
+    </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <section>
+      <h3>Цвет узлов</h3>
+      <div class="seg" id="colorModes"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <section>
+      <h3>Связи</h3>
+      <div class="chips" id="edgeToggles"></div>
+    </section>
+    <section>
+      <h3>Слои</h3>
+      <label class="check"><input type="checkbox" id="optAssets" checked> Сцены, префабы, ассеты</label>
+      <label class="check"><input type="checkbox" id="optTests" checked> Тесты</label>
+      <label class="check"><input type="checkbox" id="optEditor" checked> Editor-инструменты</label>
+      <label class="check"><input type="checkbox" id="optSmall"> enum / struct / вложенные</label>
+      <label class="check"><input type="checkbox" id="optThird"> Сторонний код</label>
+      <label class="check"><input type="checkbox" id="optCluster" checked> Группировать по папкам</label>
+      <label class="check"><input type="checkbox" id="optLabels"> Подписи всегда</label>
+    </section>
+    <section>
+      <h3>Папки <button class="link" id="catAll">все</button></h3>
+      <div id="categories" class="cats"></div>
+    </section>
+    <section class="hint">
+      Колесо — масштаб, перетаскивание — сдвиг/узел, клик — детали, двойной клик — приблизить,
+      Shift+перетаскивание — закрепить узел, Esc — сброс.
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div id="graphView" class="view active">
+      <canvas id="canvas"></canvas>
+      <div id="tooltip" class="tooltip" hidden></div>
+      <div id="overview" class="overview"></div>
+    </div>
+    <div id="statsView" class="view stats"></div>
+    <div id="toasts" class="toasts"></div>
+  </main>
+
+  <aside class="details" id="details" hidden>
+    <button class="close" id="detailsClose" title="Закрыть (Esc)">✕</button>
+    <div id="detailsBody"></div>
+  </aside>
+
+  <aside class="feed" id="feed" hidden>
+    <div class="feed-head"><h3>Лента изменений</h3><button class="close" id="feedClose">✕</button></div>
+    <div id="feedList"></div>
+  </aside>
+
+  <div class="modal" id="codeModal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <span id="codeTitle"></span>
+        <a id="codeOpen" class="btn" href="#">Открыть в VS Code</a>
+        <button class="close" id="codeClose">✕</button>
+      </div>
+      <pre id="codeBody" class="code"></pre>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

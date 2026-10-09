@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1231f5933a5ba6545a31cce284f02076, type: 3}
+  m_Name: Cigarettes
+  m_EditorClassIdentifier: Assembly-CSharp::ItemDefinition
+  displayName: "\u0421\u0438\u0433\u0430\u0440\u0435\u0442\u044B"
+  description: "\u041C\u0438\u043D\u0437\u0434\u0440\u0430\u0432 \u043F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0430\u043B.
+    +35 HP \u0437\u0430 2 \u0441\u0435\u043A\u0443\u043D\u0434\u044B."
+  icon: {fileID: 21300000, guid: 1a0fbff2651f027468dc180f0db70d78, type: 3}
+  kind: 1
+  maxStack: 5
+  weaponObjectName: 
+  effect: 0
+  amount: 35
+  duration: 2
+  useSound: {fileID: 0}
+  useStyle: 1
+  useTime: 1
+  heldPrefab: {fileID: 7237877715907426547, guid: e1727518fbde6a44ca2972ee477e017e, type: 3}
