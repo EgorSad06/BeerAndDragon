@@ -51,7 +51,8 @@ def write_md():
           "| Модули | Почему |", "|---|---|"]
     for (a, b), why in cyc.items():
         L.append(f"| {a} ↔ {b} | {why} |")
-    open(os.path.join(DOC, "module-map.md"), "w", encoding="utf-8").write("\n".join(L) + "\n")
+    # newline="\n": LF как в git (на Windows иначе CRLF, и файл после генерации считается изменённым)
+    open(os.path.join(DOC, "module-map.md"), "w", encoding="utf-8", newline="\n").write("\n".join(L) + "\n")
 
 
 def draw_png():

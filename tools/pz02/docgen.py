@@ -82,7 +82,8 @@ def main():
         lines.append("")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     body = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).rstrip() + "\n"
-    open(OUT, "w", encoding="utf-8").write(body)
+    # newline="\n": LF как в git; иначе на Windows файл получается «изменённым», а сборка -- с меткой -dirty
+    open(OUT, "w", encoding="utf-8", newline="\n").write(body)
     print("written", os.path.relpath(OUT, ROOT))
 
 
