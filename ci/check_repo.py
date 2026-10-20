@@ -97,7 +97,7 @@ def check_forbidden(files):
     for f in files:
         if f.startswith(FORBIDDEN_DIRS):
             errors.append(f"В git попала служебная папка Unity: {f}")
-        elif f.endswith(FORBIDDEN_EXT):
+        elif f.endswith(FORBIDDEN_EXT) and not f.startswith("tools/"):   # tools/ -- свои утилиты, проекты написаны вручную
             errors.append(f"В git попал сгенерированный файл IDE: {f}")
         elif f.startswith("Assets/_Recovery"):
             warnings.append(f"Сцена автосохранения в репозитории (лучше удалить): {f}")
