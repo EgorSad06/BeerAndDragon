@@ -8,5 +8,7 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Запуск на любой более новой среде .NET (9, 10, ...), если .NET 8 не установлена -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 </Project>

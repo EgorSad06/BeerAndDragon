@@ -20,7 +20,7 @@
 | Unity Hub + **Unity 6000.3.0f1** с модулем **Windows Build Support (Mono)** | ровно эта версия | файл `C:\Program Files\Unity\Hub\Editor\6000.3.0f1\Editor\Unity.exe` существует |
 | Активированная лицензия Unity Personal (вход в Unity Hub) | — | Unity Hub → Preferences → Licenses: есть лицензия |
 | Python | ≥ 3.10, без сторонних пакетов | `python --version` |
-| .NET SDK (только для просмотра состава результата, раздел 6) | 8.0 | `dotnet --list-sdks` |
+| .NET SDK (только для просмотра состава результата, раздел 6) | ≥ 8.0 (подходит и 9, 10) | `dotnet --list-sdks` |
 | Свободное место | ~6 ГБ (проект, `Library/`, две сборки) | — |
 
 Unity ставится так: Unity Hub → *Installs → Install Editor → Archive → 6000.3.0f1*, в списке модулей отметить
