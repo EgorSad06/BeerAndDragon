@@ -73,6 +73,7 @@ public static class GameConfig
         QualitySettings.vSyncCount = 0;   // иначе targetFrameRate игнорируется
         Application.targetFrameRate = Current.targetFps;
         if (Current.logLevel == "verbose" && !GameLog.VerboseEnabled) GameLog.SetVerbose(true);
+        GameLog.Verbose("Config", $"применено: QualitySettings.vSyncCount=0, Application.targetFrameRate={Application.targetFrameRate}");
     }
 
     // ---- Разбор и проверка (чистые функции -- покрыты EditMode-тестами) ----

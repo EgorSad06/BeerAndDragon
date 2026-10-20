@@ -20,6 +20,7 @@
 | Unity Hub + **Unity 6000.3.0f1** с модулем **Windows Build Support (Mono)** | ровно эта версия | файл `C:\Program Files\Unity\Hub\Editor\6000.3.0f1\Editor\Unity.exe` существует |
 | Активированная лицензия Unity Personal (вход в Unity Hub) | — | Unity Hub → Preferences → Licenses: есть лицензия |
 | Python | ≥ 3.10, без сторонних пакетов | `python --version` |
+| .NET SDK (только для просмотра состава результата, раздел 6) | 8.0 | `dotnet --list-sdks` |
 | Свободное место | ~6 ГБ (проект, `Library/`, две сборки) | — |
 
 Unity ставится так: Unity Hub → *Installs → Install Editor → Archive → 6000.3.0f1*, в списке модулей отметить
@@ -61,7 +62,7 @@ git rev-parse --short=7 HEAD           # запомнить: этот SHA дол
 .\tools\pz01\run.ps1 -Exe build\release\BeerAndDragon.exe -ciSmoke 5 -diagReport "$PWD\report.json"
 Get-Content report.json                 # "errors": 0, "targetFps": 60, "commit": "<SHA>"
 
-# 4.3 Другая конфигурация: targetFps 30 и подробный журнал (строки [DEBUG])
+# 4.3 Другая конфигурация: targetFps 30 и подробный журнал -- строка [DEBUG][Config] применено: ... targetFrameRate=30
 .\tools\pz01\run.ps1 -Exe build\release\BeerAndDragon.exe -config ci\pz01\test-config.json -ciSmoke 5 -diagReport "$PWD\report.json"
 
 # 4.4 Неверная конфигурация: [ERROR][Config] ... targetFps = sixty ..., код 2
@@ -74,7 +75,28 @@ Get-Content report.json                 # "errors": 0, "targetFps": 60, "commit"
 python ci\check_component.py --exe build\release\BeerAndDragon.exe --expect-commit (git rev-parse --short=7 HEAD)
 ```
 
-## 5. Остановка, повторный запуск, исходное состояние
+## 5. Режимы Development и Release на одном сценарии
+```powershell
+# Версия показывает режим: (Development) / (Release)
+.\tools\pz01\run.ps1 -Exe build\dev\BeerAndDragon.exe -version
+# Проверка assert: в Development -- строка [ASSERT][Build] Debug.Assert сработал; в Release её нет (вызов вырезан)
+.\tools\pz01\run.ps1 -Exe build\dev\BeerAndDragon.exe -assertProbe -ciSmoke 3
+.\tools\pz01\run.ps1 -Exe build\release\BeerAndDragon.exe -assertProbe -ciSmoke 3
+# Неверная конфигурация отклоняется в обоих режимах (проверка явная, не через assert): код 2
+.\tools\pz01\run.ps1 -Exe build\dev\BeerAndDragon.exe -config ci\pz01\bad-config.json
+```
+
+## 6. Просмотр состава результата
+```powershell
+dotnet run --project tools\pz01\AsmInspect -- build\release\BeerAndDragon.exe build\release\UnityPlayer.dll build\release\BeerAndDragon_Data\Managed\Assembly-CSharp.dll
+dotnet run --project tools\pz01\AsmInspect -- build\dev\BeerAndDragon_Data\Managed\Assembly-CSharp.dll
+Get-ChildItem build\dev -Recurse -Filter *.pdb | Measure-Object     # отладочные символы есть только в Development
+Get-Content build\dev\BeerAndDragon_Data\boot.config                # player-connection-*, wait-for-managed-debugger -- только Development
+```
+`AsmInspect` показывает импортируемые DLL нативных модулей и для управляемой сборки — версию, ссылки на сборки и
+`DebuggableAttribute`. Флаг `DisableOptimizations` означает, что JIT не оптимизирует код (Development).
+
+## 7. Остановка, повторный запуск, исходное состояние
 - **Остановка:** запуски из шага 4 завершаются сами (`-version` — сразу, `-ciSmoke N` — через N секунд после загрузки сцены).
   Окно игры закрывается крестиком или `Alt+F4`. Зависший процесс: `Stop-Process -Name BeerAndDragon`.
 - **Повторный запуск:** те же команды шага 4. Состояние между запусками не сохраняется; сохраняются только файлы
@@ -87,7 +109,7 @@ python ci\check_component.py --exe build\release\BeerAndDragon.exe --expect-comm
   ```
   Полный сброс до чистого клона: `git clean -xfd` — удаляет также `Library/`, и следующая сборка снова будет первой.
 
-## 6. Частые проблемы
+## 8. Частые проблемы
 | Симптом | Причина | Что сделать |
 |---|---|---|
 | `build.ps1`: «Не найден Unity 6000.3.0f1» | другая версия или папка Unity | установить 6000.3.0f1 через Hub или передать `-Unity <путь к Unity.exe>` |

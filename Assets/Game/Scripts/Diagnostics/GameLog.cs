@@ -78,7 +78,7 @@ public static class GameLog
         // -assertProbe: наблюдаемое различие режимов -- в Development сработает assert, в Release вызов вырезан
         if (HasArg(args, "-assertProbe"))
         {
-            Debug.Assert(false, "[assert-probe] Debug.Assert выполнен: сборка с UNITY_ASSERTIONS");
+            Debug.Assert(false, "[ASSERT][Build] Debug.Assert сработал: сборка с UNITY_ASSERTIONS");
             Info("Build", "assert-probe: строка после Debug.Assert выполнена");
         }
 

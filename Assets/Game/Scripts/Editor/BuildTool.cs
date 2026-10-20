@@ -42,7 +42,9 @@ public static class BuildTool
 
         BuildInfoGenerator.Write();
         BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
-        Debug.Log($"[Build] режим={(development ? "Development" : "Release")} target={target} options={options} " +
+        // Флаги перечисляем явно: BuildOptions.ToString() печатает лишние имена (в перечислении есть элементы с одинаковыми битами)
+        Debug.Log($"[Build] режим={(development ? "Development" : "Release")} target={target} " +
+                  $"Development={(options & BuildOptions.Development) != 0} AllowDebugging={(options & BuildOptions.AllowDebugging) != 0} " +
                   $"backend={PlayerSettings.GetScriptingBackend(UnityEditor.Build.NamedBuildTarget.FromBuildTargetGroup(group))} " +
                   $"stripping={PlayerSettings.GetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.FromBuildTargetGroup(group))} " +
                   $"version={PlayerSettings.bundleVersion} out={output}/{exe}");

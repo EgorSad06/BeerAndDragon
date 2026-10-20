@@ -20,8 +20,8 @@ $stdout = "$log.stdout"   # служебный вывод плеера ([UnityMe
 $p = Start-Process -FilePath $Exe -ArgumentList $argsList -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout
 Remove-Item $stdout -ErrorAction SilentlyContinue
 
-# Строки диагностики игры ([INFO]/[WARN]/[ERROR]/[DEBUG]) и строка версии
-Get-Content $log -Encoding UTF8 | Where-Object { $_ -match '^\[(INFO|WARN|ERROR|DEBUG)\]' -or $_ -match '^BeerAndDragon \d' }
+# Строки диагностики игры ([INFO]/[WARN]/[ERROR]/[DEBUG]/[ASSERT]) и строка версии
+Get-Content $log -Encoding UTF8 | Where-Object { $_ -match '^\[(INFO|WARN|ERROR|DEBUG|ASSERT)\]' -or $_ -match '^BeerAndDragon \d' }
 Remove-Item $log -ErrorAction SilentlyContinue
 Write-Host "Код завершения: $($p.ExitCode)"
 exit $p.ExitCode
