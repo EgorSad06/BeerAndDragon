@@ -1,40 +1,51 @@
 using System;
 using System.Collections.Generic;
 
-// Пул объектов с жёстким лимитом. Первый модуль направления «управление памятью в реальном времени»
-// (docs/system-programming.md, модуль SP-1).
-//
-// Контракт:
-//  - Get() отдаёт свободный объект; если свободных нет и создано меньше capacity -- создаёт новый;
-//    если лимит исчерпан -- действует по OverflowPolicy (ReuseOldest: забирает самый старый выданный,
-//    Fail: возвращает null). Больше capacity объектов не существует никогда.
-//  - Release(x) возвращает объект в пул. Повторный возврат или чужой объект -- InvalidOperationException
-//    (такая ошибка в игре означает «один объект используется дважды», её надо ловить сразу).
-//  - После Prewarm/прогрева Get и Release не выделяют память в куче (нет LINQ, замыканий, роста коллекций).
-//  - onGet вызывается при каждой выдаче, onRelease -- при каждом возврате (в т.ч. принудительном при ReuseOldest).
-//  - Не потокобезопасен: только главный поток Unity.
-public sealed class BoundedPool<T> where T : class
+/// <summary>
+/// Реализация <see cref="IObjectPool{T}"/> без выделений памяти после прогрева (модуль SP-1).
+/// Свободные объекты — в стеке, выданные — в словаре «объект → номер выдачи»; самый старый ищется
+/// линейным проходом по выданным, поэтому <see cref="Get"/> при переполнении стоит O(Capacity).
+/// </summary>
+/// <remarks>
+/// Все коллекции создаются сразу ёмкостью <see cref="Capacity"/> и не растут, поэтому после
+/// <see cref="Prewarm"/> вызовы <see cref="Get"/> / <see cref="Release"/> не выделяют память в управляемой куче
+/// (проверено тестом <c>BoundedPoolTests.SteadyState_GetRelease_DoesNotAllocate</c>).
+/// Поведение — по контракту <see cref="IObjectPool{T}"/>.
+/// </remarks>
+public sealed class BoundedPool<T> : IObjectPool<T> where T : class
 {
-    public enum OverflowPolicy { ReuseOldest, Fail }
-
     private readonly Func<T> create;
     private readonly Action<T> onGet;
     private readonly Action<T> onRelease;
-    private readonly OverflowPolicy overflow;
+    private readonly PoolOverflow overflow;
 
     private readonly Stack<T> free;
     private readonly Dictionary<T, long> active;   // объект -> номер выдачи (для поиска самого старого)
     private readonly HashSet<T> owned;             // все объекты, созданные этим пулом
     private long stamp;
 
+    /// <inheritdoc/>
     public int Capacity { get; }
+    /// <inheritdoc/>
     public int CountActive => active.Count;
+    /// <inheritdoc/>
     public int CountInactive => free.Count;
+    /// <inheritdoc/>
     public int CountAll => owned.Count;
+    /// <inheritdoc/>
     public int CreatedTotal { get; private set; }
+    /// <inheritdoc/>
     public int Recycled { get; private set; }      // сколько раз сработал ReuseOldest
 
-    public BoundedPool(Func<T> create, int capacity, OverflowPolicy overflow = OverflowPolicy.ReuseOldest,
+    /// <summary>Создать пул. Объекты не создаются, пока не вызван <see cref="Get"/> или <see cref="Prewarm"/>.</summary>
+    /// <param name="create">Фабрика объекта; не должна возвращать <c>null</c>.</param>
+    /// <param name="capacity">Лимит объектов, &gt; 0.</param>
+    /// <param name="overflow">Что делать при исчерпанном лимите.</param>
+    /// <param name="onGet">Вызывается для каждого выдаваемого объекта (необязательно).</param>
+    /// <param name="onRelease">Вызывается для каждого возвращаемого и забираемого объекта (необязательно).</param>
+    /// <exception cref="ArgumentNullException"><paramref name="create"/> равен <c>null</c> (проверяется первым).</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="capacity"/> &lt;= 0.</exception>
+    public BoundedPool(Func<T> create, int capacity, PoolOverflow overflow = PoolOverflow.ReuseOldest,
         Action<T> onGet = null, Action<T> onRelease = null)
     {
         if (create == null) throw new ArgumentNullException(nameof(create));
@@ -52,7 +63,7 @@ public sealed class BoundedPool<T> where T : class
         owned = new HashSet<T>(capacity);
     }
 
-    // Создаёт объекты заранее (например, на загрузке уровня), чтобы в бою не было аллокаций.
+    /// <inheritdoc/>
     public void Prewarm(int count)
     {
         count = Math.Min(count, Capacity);
@@ -64,6 +75,7 @@ public sealed class BoundedPool<T> where T : class
         }
     }
 
+    /// <inheritdoc/>
     public T Get()
     {
         T item;
@@ -75,7 +87,7 @@ public sealed class BoundedPool<T> where T : class
         {
             item = CreateItem();
         }
-        else if (overflow == OverflowPolicy.ReuseOldest && active.Count > 0)
+        else if (overflow == PoolOverflow.ReuseOldest && active.Count > 0)
         {
             item = Oldest();
             active.Remove(item);
@@ -92,6 +104,7 @@ public sealed class BoundedPool<T> where T : class
         return item;
     }
 
+    /// <inheritdoc/>
     public void Release(T item)
     {
         if (item == null) throw new ArgumentNullException(nameof(item));
@@ -102,6 +115,7 @@ public sealed class BoundedPool<T> where T : class
         free.Push(item);
     }
 
+    /// <inheritdoc/>
     public bool IsActive(T item) => item != null && active.ContainsKey(item);
 
     private T CreateItem()

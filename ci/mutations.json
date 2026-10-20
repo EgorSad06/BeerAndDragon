@@ -56,6 +56,13 @@
       "find": "if (!active.Remove(item)) throw new InvalidOperationException(\"Объект уже возвращён в пул\");",
       "replace": "active.Remove(item);",
       "what": "повторный возврат не обнаруживается -- один объект окажется в пуле дважды"
+    },
+    {
+      "id": "linked-recycles-newest",
+      "file": "Assets/Game/Scripts/Core/LinkedPool.cs",
+      "find": "            LinkedListNode<T> oldest = order.First;",
+      "replace": "            LinkedListNode<T> oldest = order.Last;",
+      "what": "LinkedPool при переполнении забирает самый новый объект вместо самого старого"
     }
   ]
 }

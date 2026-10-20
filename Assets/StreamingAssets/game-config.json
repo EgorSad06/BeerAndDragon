@@ -1,4 +1,5 @@
 {
   "targetFps": 60,
-  "logLevel": "info"
+  "logLevel": "info",
+  "decalPool": "bounded"
 }

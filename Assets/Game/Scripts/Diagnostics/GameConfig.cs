@@ -10,6 +10,7 @@ using UnityEngine;
 //
 //   targetFps -- целое 15..300: ограничение частоты кадров (видно в smoke-отчёте по avgFps)
 //   logLevel  -- "info" | "verbose": verbose включает подробный журнал, как аргумент -diag
+//   decalPool -- "bounded" | "linked": реализация пула дырок от пуль (ПЗ-2, точка сборки в Weapon)
 //
 // Неверное значение, неизвестный ключ, битый JSON, отсутствующий файл, заданный через -config, --
 // понятная ошибка в журнале [ERROR][Config] и выход с кодом 2 (ExitCodeConfigError).
@@ -24,9 +25,11 @@ public static class GameConfig
     {
         public int targetFps = 60;
         public string logLevel = "info";
+        public PoolKind decalPool = PoolKind.Bounded;
     }
 
     public static Values Current { get; private set; } = new Values();
+    public static PoolKind DecalPoolKind => Current.decalPool;
     public static string SourcePath { get; private set; }
 
     // Загружает конфигурацию по аргументам запуска. false -- ошибка (текст в error).
@@ -111,8 +114,17 @@ public static class GameConfig
                     values.logLevel = level;
                     break;
 
+                case "decalPool":
+                    if (!kv.Value.IsString || !ObjectPoolFactory.TryParse(kv.Value.Raw, out PoolKind kind))
+                    {
+                        error = $"decalPool = {kv.Value.Raw} -- ожидается \"bounded\" или \"linked\"";
+                        return false;
+                    }
+                    values.decalPool = kind;
+                    break;
+
                 default:
-                    error = $"неизвестный параметр \"{kv.Key}\" (допустимы: targetFps, logLevel)";
+                    error = $"неизвестный параметр \"{kv.Key}\" (допустимы: targetFps, logLevel, decalPool)";
                     return false;
             }
         }
@@ -120,7 +132,7 @@ public static class GameConfig
         return true;
     }
 
-    public static string Describe(Values v) => $"targetFps={v.targetFps}, logLevel={v.logLevel}";
+    public static string Describe(Values v) => $"targetFps={v.targetFps}, logLevel={v.logLevel}, decalPool={v.decalPool.ToString().ToLowerInvariant()}";
 }
 
 // Разбор плоского JSON-объекта { "ключ": число | "строка" | true/false }. JsonUtility не подходит:

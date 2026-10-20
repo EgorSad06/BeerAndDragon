@@ -127,7 +127,10 @@ public class Weapon : MonoBehaviour
     public float decalLifetime = 20f;       // 0 = никогда не удалять по времени
     public int maxDecals = 60;
     public LayerMask decalIgnoreLayers;
-    private static readonly Queue<GameObject> spawnedDecals = new Queue<GameObject>();
+    private BulletHoles bulletHoles;          // потребитель пула; реализацию пула выбирает SetupBulletHoles
+
+    /// <summary>Дырки от пуль этого оружия (null, если префаб не назначен). Для диагностики.</summary>
+    public BulletHoles BulletHoles => bulletHoles;
 
     [Header("Animation hooks (если есть Animator)")]
     public Animator animator;
@@ -166,6 +169,35 @@ public class Weapon : MonoBehaviour
             kickRestPos = recoilTransform.localPosition;
             kickRestRot = recoilTransform.localRotation;
         }
+        SetupBulletHoles();
+    }
+
+    void Start()
+    {
+        // -decalProbe N: воспроизводимый прогон пула декалей (модуль-кандидат ПЗ-2)
+        if (bulletHoles != null) BulletHoleProbe.RunIfRequested(bulletHoles, System.Environment.GetCommandLineArgs());
+    }
+
+    // Точка сборки: реализация пула декалей -- из конфигурации (decalPool), потребитель BulletHoles получает
+    // только IObjectPool<GameObject>. Декали создаются заранее (Prewarm), чтобы в бою не было Instantiate.
+    private void SetupBulletHoles()
+    {
+        if (bulletHolePrefab == null || maxDecals <= 0) return;
+
+        Transform root = new GameObject("[BulletHoles] " + name).transform;
+        IObjectPool<GameObject> pool = ObjectPoolFactory.Create(GameConfig.DecalPoolKind,
+            () =>
+            {
+                GameObject go = Instantiate(bulletHolePrefab, root);
+                go.SetActive(false);
+                return go;
+            },
+            maxDecals, PoolOverflow.ReuseOldest,
+            onGet: go => go.SetActive(true),
+            onRelease: go => go.SetActive(false));
+        pool.Prewarm(maxDecals);
+        bulletHoles = new BulletHoles(pool, decalOffset, decalLifetime, flipDecalNormal);
+        GameLog.Verbose("Weapon", $"{name}: пул декалей {pool.GetType().Name}, лимит {maxDecals}");
     }
 
     // Переключение оружия выключает объект -- прерываем перезарядку/передёргивание,
@@ -188,6 +220,7 @@ public class Weapon : MonoBehaviour
     void Update()
     {
         HandleInput();
+        bulletHoles?.Tick(Time.time);
         currentSpreadBloom = Mathf.Max(0f, currentSpreadBloom - spreadRecoverySpeed * Time.deltaTime);
         UpdateViewKick();
     }
@@ -373,21 +406,7 @@ public class Weapon : MonoBehaviour
         if (((1 << hit.collider.gameObject.layer) & decalIgnoreLayers) != 0) return;
         if (hit.rigidbody != null) return; // на летающих ящиках дырки выглядят странно
 
-        Vector3 normal = flipDecalNormal ? -hit.normal : hit.normal;
-        Quaternion rot = Quaternion.LookRotation(normal) * Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
-        Vector3 pos = hit.point + hit.normal * decalOffset;
-
-        GameObject decal = Instantiate(bulletHolePrefab, pos, rot, hit.collider.transform);
-
-        spawnedDecals.Enqueue(decal);
-        while (spawnedDecals.Count > maxDecals)
-        {
-            GameObject oldest = spawnedDecals.Dequeue();
-            if (oldest != null) Destroy(oldest);
-        }
-
-        if (decalLifetime > 0f)
-            Destroy(decal, decalLifetime);
+        bulletHoles?.Place(hit.point, hit.normal, Random.Range(0f, 360f), Time.time);
     }
 
     private void ApplyRecoil(Vector3 aimDir)

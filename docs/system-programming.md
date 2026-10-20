@@ -29,7 +29,7 @@
 
 ## 2. Первый модуль — SP-1 `BoundedPool<T>`
 **Файл:** [`Assets/Game/Scripts/Core/BoundedPool.cs`](../Assets/Game/Scripts/Core/BoundedPool.cs)
-**Тесты:** [`Assets/Game/Tests/Editor/BoundedPoolTests.cs`](../Assets/Game/Tests/Editor/BoundedPoolTests.cs) (10 тестов)
+**Тесты:** [`ObjectPoolContractTests`](../Assets/Game/Tests/Editor/ObjectPoolContractTests.cs) (контракт для обеих реализаций), [`BoundedPoolTests`](../Assets/Game/Tests/Editor/BoundedPoolTests.cs) (память). С ПЗ-2 контракт вынесен в интерфейс `IObjectPool<T>` — [docs/modules/object-pool.md](modules/object-pool.md)
 **Засеянные дефекты:** `pool-recycles-newest`, `pool-double-release` в [`ci/mutations.json`](../ci/mutations.json)
 
 Модуль — чистый C# без зависимостей от сцены, поэтому тестируется в EditMode без запуска игры
@@ -83,6 +83,6 @@ public sealed class BoundedPool<T> where T : class
 | Контракт и реализация `BoundedPool<T>` | ✅ готово |
 | 10 EditMode-тестов на все пункты контракта, включая отсутствие аллокаций | ✅ готово (локально проверены в .NET 8: 0 байт за 100 циклов) |
 | Засеянные дефекты для mutation testing | ✅ 2 мутанта |
-| SP-1b: `Weapon.SpawnBulletHole` через пул (`Instantiate/Destroy` → `Get/Release`, `onGet` — `SetActive(true)` + позиция, `onRelease` — `SetActive(false)`) | 🔨 следующий шаг |
-| Замер «до/после» в Profiler (GC Alloc на выстрел) | 📋 после SP-1b |
+| SP-1b: `Weapon.SpawnBulletHole` через пул (`Instantiate/Destroy` → `Get/Release`, `onGet` — `SetActive(true)` + позиция, `onRelease` — `SetActive(false)`) | ✅ ПЗ-2: потребитель `BulletHoles`, точка сборки `Weapon.SetupBulletHoles`, вторая реализация `LinkedPool` |
+| Замер «до/после» в Profiler (GC Alloc на выстрел) | 📋 воспроизводимый вход готов (`-decalProbe N`), замеры — следующие работы |
 | SP-2: `RaycastCommand` для дроби | 📋 направление B |

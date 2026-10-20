@@ -13,5 +13,11 @@
 | 6 | **Профилирование** | Unity Profiler; режим `-diag`; smoke-замер Release Gate | Время кадра по подсистемам (скрипты, физика, рендер), выделения памяти (GC Alloc), FPS и память раз в ~10 с | *Window → Analysis → Profiler* → Play в редакторе или подключение к Development-сборке (`-executeMethod BuildTool.BuildDevelopment`); smoke-метрики — `-ciSmoke N -diagReport r.json` | работает вручную; автоматическое профилирование в CI — **запланировано** (ПЗ «профилирование», `pz-checks.yml`) |
 | 7 | **Автоматические проверки (CI)** | GitHub Actions + GameCI | Проверки на каждое изменение и по запросу | Push и PR → [`pr.yml`](../.github/workflows/pr.yml) (структура, lint, секреты, EditMode-тесты); push в `main` → [`main.yml`](../.github/workflows/main.yml) (+ сборка Windows, артефакт); тег `0104-pz01-*` / PR компонента → [`pz01.yml`](../.github/workflows/pz01.yml) (сборка Linux + [`check_component.py`](../ci/check_component.py)); вручную → [`pz-checks.yml`](../.github/workflows/pz-checks.yml) (мутации, диагностика); тег `vX.Y.Z` → [`release.yml`](../.github/workflows/release.yml) | работает |
 
+**Документирование кода (ПЗ-2).** Стандарт — XML-комментарии C# (`/// <summary>`, `<param>`, `<returns>`, `<exception>`,
+`<example>`). Для модуля `ObjectPool` компилятор генерирует XML-документацию (`dotnet build tools/pz02/PoolDoc`;
+отсутствие документации — ошибка CS1591), справочник `docs/modules/object-pool-api.md` строится `python tools/pz02/docgen.py`.
+**Модульная карта** — `docs/architecture/modules.json`, соответствие коду проверяет `python ci/check_module_map.py`
+(статический анализ, в CI — `_checks.yml`).
+
 Одно средство закрывает несколько позиций. Редактор Unity — это сборка, тестирование, профилирование и отладка.
 Python-скрипты `ci/` — это статический анализ и автоматические проверки. Подробно о конвейере — [CI.md](CI.md).

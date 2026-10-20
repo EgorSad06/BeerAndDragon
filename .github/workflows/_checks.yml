@@ -32,6 +32,14 @@ jobs:
       - name: Засеянные дефекты актуальны (строки для мутаций есть в коде)
         run: python ci/apply_mutation.py --check-all
 
+      - name: Модульная карта соответствует коду
+        run: python ci/check_module_map.py
+
+      # Модуль ObjectPool не зависит от Unity: собираем его обычным dotnet с XML-документацией,
+      # публичный член без документации или битый cref -- ошибка сборки
+      - name: Документация модуля ObjectPool (XML-комментарии)
+        run: dotnet build tools/pz02/PoolDoc -nologo
+
       # gitleaks CLI напрямую (без gitleaks-action): работает одинаково в push и PR,
       # не ходит в GitHub API и не требует лишних прав. Сканирует всю историю.
       - name: Поиск секретов в репозитории (gitleaks)

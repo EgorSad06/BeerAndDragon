@@ -34,6 +34,17 @@
 | Автоматическая проверка компонента | [ci/check_component.py](ci/check_component.py), [.github/workflows/pz01.yml](.github/workflows/pz01.yml) |
 | Протокол воспроизведения | [docs/pz01/protocol.md](docs/pz01/protocol.md) |
 
+### МДК.01.04, ПЗ-2: модульная архитектура и контракт модуля
+| Результат | Где |
+|---|---|
+| Модуль и контракт (ответственность, вход, результат, ошибки, владение, побочные эффекты) | [docs/modules/object-pool.md](docs/modules/object-pool.md), код [Assets/Game/Scripts/Core/](Assets/Game/Scripts/Core/) |
+| Документация API (XML-комментарии C#) | [docs/modules/object-pool-api.md](docs/modules/object-pool-api.md), проверка `dotnet build tools/pz02/PoolDoc` |
+| Потребитель и точка сборки | [BulletHoles.cs](Assets/Game/Scripts/GunScript/BulletHoles.cs), `Weapon.SetupBulletHoles`, параметр `decalPool` |
+| Две реализации и подмена | `BoundedPool` / `LinkedPool`, тесты [ObjectPoolContractTests](Assets/Game/Tests/Editor/ObjectPoolContractTests.cs), [BulletHolesTests](Assets/Game/Tests/Editor/BulletHolesTests.cs) |
+| Модульная карта | [docs/architecture/module-map.md](docs/architecture/module-map.md), проверка `python ci/check_module_map.py` |
+| Профиль сложности, модуль-кандидат, ADR | [docs/complexity-profile.md](docs/complexity-profile.md), [ADR-002](docs/adr/ADR-002-decal-pool.md) |
+| Проверка модуля по инструкции | [docs/pz02/CHECK.md](docs/pz02/CHECK.md), протокол [docs/pz02/protocol.md](docs/pz02/protocol.md) |
+
 ### CI (Minimal CI)
 | Уровень | Файл | Когда запускается |
 |---|---|---|

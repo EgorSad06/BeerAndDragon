@@ -45,6 +45,20 @@ public class GameConfigTests
         StringAssert.Contains("вне диапазона", ParseError("{ \"targetFps\": " + fps + " }"));
     }
 
+    [TestCase("bounded", PoolKind.Bounded)]
+    [TestCase("LINKED", PoolKind.Linked)]
+    public void DecalPool_SelectsImplementation(string value, PoolKind expected)
+    {
+        Assert.AreEqual(expected, Parse("{ \"decalPool\": \"" + value + "\" }").decalPool);
+    }
+
+    [Test]
+    public void DecalPool_Unknown_IsError()
+    {
+        StringAssert.Contains("decalPool", ParseError("{ \"decalPool\": \"magic\" }"));
+        StringAssert.Contains("decalPool", ParseError("{ \"decalPool\": 1 }"));
+    }
+
     [Test]
     public void LogLevel_Unknown_IsError()
     {

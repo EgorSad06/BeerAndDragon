@@ -128,3 +128,6 @@ InitTestScene*.unity*
 tools/pz01/AsmInspect/bin/
 tools/pz01/AsmInspect/obj/
 !tools/pz01/AsmInspect/AsmInspect.csproj
+!tools/pz02/PoolDoc/PoolDoc.csproj
+tools/pz02/PoolDoc/bin/
+tools/pz02/PoolDoc/obj/
