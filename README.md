@@ -45,6 +45,17 @@
 | Профиль сложности, модуль-кандидат, ADR | [docs/complexity-profile.md](docs/complexity-profile.md), [ADR-002](docs/adr/ADR-002-decal-pool.md) |
 | Проверка модуля по инструкции | [docs/pz02/CHECK.md](docs/pz02/CHECK.md), протокол [docs/pz02/protocol.md](docs/pz02/protocol.md) |
 
+### МДК.03.02, ПЗ-1: требования и регламент (участок «Оружие и попадания»)
+| Результат | Где |
+|---|---|
+| Устав проекта | [docs/charter.md](docs/charter.md) |
+| Обследование: вопросы и протокол | [docs/mdk0302/survey.md](docs/mdk0302/survey.md) |
+| Спецификация 1.0, требования участка (Дано — Когда — Тогда) | [docs/requirements.md](docs/requirements.md), раздел 5.2 |
+| Место участка в сценарии и MVP | [docs/mvp.md](docs/mvp.md) |
+| Исходное состояние и ограничения безопасности | [docs/mdk0302/initial-state-security.md](docs/mdk0302/initial-state-security.md) |
+| Регламент и DoD | [docs/repo-rules.md](docs/repo-rules.md) |
+| Проверка однозначности, оппонирование, baseline | [docs/mdk0302/ambiguity-check.md](docs/mdk0302/ambiguity-check.md), [docs/mdk0302/opposition.md](docs/mdk0302/opposition.md) |
+
 ### CI (Minimal CI)
 | Уровень | Файл | Когда запускается |
 |---|---|---|
