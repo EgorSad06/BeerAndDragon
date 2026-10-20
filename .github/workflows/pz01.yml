@@ -1,0 +1,68 @@
+# ПЗ-1 (МДК.01.04): базовая автоматическая проверка минимального компонента.
+# Собирает игру (Linux, без графики), запускает её и проверяет наблюдаемый результат:
+# идентификатор версии = коммит этой сборки, штатный запуск с тестовой конфигурацией,
+# ошибка и код 2 при неверной конфигурации. Скрипт проверки: ci/check_component.py.
+#
+# Запуск: тег сдачи 0104-pz01-<код>-vN, PR с изменениями компонента, вручную (Actions -> PZ-01 component check).
+name: PZ-01 component check
+
+on:
+  push:
+    tags: ["0104-pz01-*"]
+  pull_request:
+    branches: [main]
+    paths:
+      - "Assets/Game/Scripts/Diagnostics/**"
+      - "Assets/Game/Scripts/Editor/BuildTool.cs"
+      - "Assets/StreamingAssets/**"
+      - "ci/check_component.py"
+      - "ci/pz01/**"
+      - ".github/workflows/pz01.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pz01-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    secrets: inherit
+
+  build:
+    needs: checks
+    uses: ./.github/workflows/_unity-build.yml
+    with:
+      target: StandaloneLinux64
+      versioning: None          # версия -- из ProjectSettings (bundleVersion), коммит -- из build_info.json
+      retention-days: 7
+    secrets: inherit
+
+  component:
+    name: Component check
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: dist
+
+      - name: Проверка компонента
+        run: |
+          exe=$(find dist -maxdepth 2 -type f -name 'BeerAndDragon*' ! -name '*.so' ! -name '*.debug' | head -1)
+          chmod +x "$exe"
+          echo "Проверяемый файл: $exe"
+          python3 ci/check_component.py --exe "$exe" --expect-commit "${GITHUB_SHA::7}" | tee check.txt
+          code=${PIPESTATUS[0]}
+          { echo '## ПЗ-1: проверка компонента'; echo '```'; cat check.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $code

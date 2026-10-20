@@ -87,6 +87,9 @@ public class DiagnosticsRunner : MonoBehaviour
         float avgFps = fpsTime > 0f ? frames / fpsTime : 0f;
         string json = "{\n" +
             $"  \"version\": \"{Application.version}\",\n" +
+            $"  \"build\": \"{BuildInfo.Full}\",\n" +
+            $"  \"commit\": \"{BuildInfo.Commit}\",\n" +
+            $"  \"targetFps\": {GameConfig.Current.targetFps},\n" +
             $"  \"unity\": \"{Application.unityVersion}\",\n" +
             $"  \"platform\": \"{Application.platform}\",\n" +
             $"  \"firstSceneLoadedSeconds\": {firstSceneTime.ToString("0.000", CultureInfo.InvariantCulture)},\n" +
@@ -105,6 +108,6 @@ public class DiagnosticsRunner : MonoBehaviour
 
         GameLog.Info("Smoke", (errorCount == 0 ? "SMOKE OK" : "SMOKE FAIL") +
                               $" | старт сцены {firstSceneTime:0.00} с | ~{avgFps:0} FPS | ошибок {errorCount}");
-        Application.Quit(errorCount == 0 ? 0 : 1);
+        GameLog.Quit(errorCount == 0 ? 0 : 1, errorCount == 0 ? "smoke-прогон успешен" : $"в журнале ошибок: {errorCount}");
     }
 }

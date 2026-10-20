@@ -23,12 +23,24 @@
 | Реализация первого модуля | [Assets/Game/Scripts/Core/BoundedPool.cs](Assets/Game/Scripts/Core/BoundedPool.cs) | пул объектов без аллокаций |
 | Тесты первого модуля | [Assets/Game/Tests/Editor/BoundedPoolTests.cs](Assets/Game/Tests/Editor/BoundedPoolTests.cs) | 10 тестов, по одному на пункт контракта |
 
+### МДК.01.04, ПЗ-1: инструментальный контур и минимальный компонент
+| Результат | Где |
+|---|---|
+| ADR-001 — язык, технологии, модель исполнения | [docs/adr/ADR-001-stack.md](docs/adr/ADR-001-stack.md) |
+| Декларация инструментального контура (7 позиций) | [docs/toolchain.md](docs/toolchain.md) |
+| Инструкция: сборка и запуск из чистого окружения | [docs/RUN.md](docs/RUN.md) |
+| Минимальный компонент: конфигурация, версия, диагностика | [GameConfig.cs](Assets/Game/Scripts/Diagnostics/GameConfig.cs), [BuildInfo.cs](Assets/Game/Scripts/Diagnostics/BuildInfo.cs), [GameLog.cs](Assets/Game/Scripts/Diagnostics/GameLog.cs), конфиг [game-config.json](Assets/StreamingAssets/game-config.json) |
+| Сборка в режимах Development / Release | [BuildTool.cs](Assets/Game/Scripts/Editor/BuildTool.cs), [tools/pz01/build.ps1](tools/pz01/build.ps1) |
+| Автоматическая проверка компонента | [ci/check_component.py](ci/check_component.py), [.github/workflows/pz01.yml](.github/workflows/pz01.yml) |
+| Протокол воспроизведения | [docs/pz01/protocol.md](docs/pz01/protocol.md) |
+
 ### CI (Minimal CI)
 | Уровень | Файл | Когда запускается |
 |---|---|---|
 | Repository / PR checks | [.github/workflows/pr.yml](.github/workflows/pr.yml) → [_checks.yml](.github/workflows/_checks.yml) + [_unity-tests.yml](.github/workflows/_unity-tests.yml) | каждый PR и push в рабочие ветки |
 | Main pipeline (сборка + тесты + артефакт) | [.github/workflows/main.yml](.github/workflows/main.yml) → [_unity-build.yml](.github/workflows/_unity-build.yml) | push в `main` |
 | Проверки ПЗ (мутации, диагностика) | [.github/workflows/pz-checks.yml](.github/workflows/pz-checks.yml) | вручную: Actions → *PZ checks* |
+| ПЗ-1: проверка компонента (версия, конфигурация, коды завершения) | [.github/workflows/pz01.yml](.github/workflows/pz01.yml) | тег `0104-pz01-*`, PR компонента, вручную |
 | Release Gate | [.github/workflows/release.yml](.github/workflows/release.yml) | тег `vX.Y.Z` |
 | Скрипты проверок (Python, без Unity) | [ci/](ci/) — `check_repo.py`, `lint_cs.py`, `apply_mutation.py`, `mutations.json`, `sbom.py` | локально и в CI |
 | Описание CI и соответствие требованиям | [docs/CI.md](docs/CI.md) | |
