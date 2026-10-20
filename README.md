@@ -47,7 +47,7 @@ Assets/Game/
 │   ├── Diagnostics/              журнал, headless-прогон для CI                FR-DIAG
 │   ├── Core/                     системные модули: пул объектов                SP-1
 │   └── Editor/                   инструменты редактора (меню Tools → BeerAndDragon)
-├── Tests/Editor/                 EditMode-тесты (37)
+├── Tests/Editor/                 EditMode-тесты (45)
 └── Assets/                       сторонние паки и сгенерированные ассеты (Git LFS)
 tools/codemap/                    CodeMap — живая карта кода в браузере (codemap.cmd)
 ```

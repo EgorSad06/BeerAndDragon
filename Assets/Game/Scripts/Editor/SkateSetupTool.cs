@@ -95,6 +95,7 @@ public static class SkateSetupTool
         }
 
         BuildSkatePark(player.transform.position - fwd * 10f, -fwd);
+        ArtUpgradeTool.GrindSetup();   // перила -- на слой Grind, материал искр (сброс выше его обнулил)
 
         EditorSceneManager.MarkSceneDirty(player.gameObject.scene);
         Debug.Log("[Skate] Готово: доска рядом с игроком (E -- встать), скейтпарк за спиной. Сохрани сцену.");
@@ -365,6 +366,7 @@ static class PendingSceneSetup
         if (tasks.Contains("knight")) KnightSetupTool.SetupKnight();
         if (tasks.Contains("use")) ItemUseSetupTool.Setup();
         if (tasks.Contains("sound")) SkateSoundsSetupTool.Setup();
+        if (tasks.Contains("art")) ArtUpgradeTool.Apply();
         Debug.Log("[BeerAndDragon] Автонастройка сцены выполнена. Нажми Ctrl+S, чтобы сохранить сцену.");
     }
 }

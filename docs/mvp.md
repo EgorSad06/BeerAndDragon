@@ -21,7 +21,7 @@ MVP — минимальный набор функций, без которог�
 | Коробки патронов с лимитом запаса | FR-WPN-04, ERR-04 | ✅ | `Items/AmmoPickup.cs` |
 | HUD: здоровье, патроны, хотбар, сообщения | — | ✅ | `UI/GameHUD.cs`, `Items/HudMessages.cs` |
 | Журнал работы и headless-режим для CI | FR-DIAG-01…04 | ✅ | `Diagnostics/` |
-| Автотесты ключевой логики | NFR-09 | ✅ 37 EditMode-тестов | `Assets/Game/Tests/Editor/` |
+| Автотесты ключевой логики | NFR-09 | ✅ 45 EditMode-тестов | `Assets/Game/Tests/Editor/` |
 
 ## Резерв (не входит в MVP)
 | Функция | Почему в резерве | Статус |

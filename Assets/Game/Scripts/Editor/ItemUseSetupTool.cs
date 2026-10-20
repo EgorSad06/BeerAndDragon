@@ -31,6 +31,7 @@ public static class ItemUseSetupTool
 
         SetItem(G.ItemsDir + "/Cigarettes.asset", ItemDefinition.UseStyle.Smoke, heldCig);
         SetItem(G.ItemsDir + "/MonsterEnergy.asset", ItemDefinition.UseStyle.Drink, heldCan);
+        ArtUpgradeTool.RedBullCan();   // банка из PS1 Cans поверх сгенерированной (тот же префаб)
 
         ItemUser user = player.GetComponent<ItemUser>();
         if (user == null) user = Undo.AddComponent<ItemUser>(player.gameObject);

@@ -10,13 +10,16 @@ using UnityEngine;
 //   Space -- олли (держи дольше -- прыжок выше; с перил/мэньюала -- тоже работает)
 //   ЛКМ + направление -- флип (Kickflip / Impossible / Pop Shuvit / Heelflip / Varial)
 //   ПКМ (держать) + направление -- грэб (Melon / Nosegrab / Tailgrab / Indy / Stalefish)
-//   E в воздухе у перил/края -- грайнд, A/D держат баланс
+//   E в воздухе у перил/края -- грайнд, A/D держат баланс (перила -- любой коллайдер на слое "Grind")
 //   Ctrl на земле -- мэньюал, W/S держат баланс
 //   E на земле -- слезть
+//   Спец-шкала полная: ПКМ (держать) + ЛКМ + направление -- спец-трюк
 //
-// Комбо: каждый трюк добавляет очки и +1 к множителю. Приземлился и проехал чуть-чуть
-// без мэньюала -- комбо засчитано. Бэйл (не докрутил флип, приземлился боком,
-// врезался в стену, потерял баланс) -- комбо сгорает, а доска улетает.
+// Спин раскручивается постепенно (A/D в воздухе), A/D, зажатые в момент олли, дают стартовый спин.
+// Приземление: PERFECT (ровно) -- бонус, SKETCHY (криво) -- штраф и потеря скорости, боком на скорости -- бэйл.
+// Комбо: каждый трюк добавляет очки и +1 к множителю, повтор того же трюка в комбо стоит всё меньше.
+// Приземлился и проехал чуть-чуть без мэньюала -- комбо засчитано. Бэйл (не докрутил флип,
+// приземлился боком, врезался в стену, потерял баланс) -- комбо и спец-шкала сгорают, доска улетает.
 [RequireComponent(typeof(Rigidbody))]
 public class SkaterController : MonoBehaviour
 {
@@ -53,9 +56,16 @@ public class SkaterController : MonoBehaviour
     public float ollieMaxVelocity = 9.5f;
     public float ollieChargeTime = 0.45f;
 
+    public float ollieCooldown = 0.25f;     // после приземления столько ждать до следующего олли
+
     [Header("Air")]
-    public float airSpinSpeed = 420f;       // град/сек
-    public float landAngleTolerance = 80f;  // насколько можно приземлиться "не по ходу"
+    public float airSpinMaxSpeed = 380f;    // град/сек -- потолок спина
+    public float airSpinAccel = 1500f;      // разгон (град/сек²): тап A/D -- это не полный оборот
+    public float airSpinDecel = 1100f;      // отпустил A/D -- спин гаснет
+    public float spinPrewind = 220f;        // A/D зажаты в момент олли -- стартовая скорость спина
+    public float perfectLandAngle = 12f;    // отклонение от хода (с учётом фейки) -- PERFECT
+    public float sketchyLandAngle = 40f;    // больше -- SKETCHY
+    public float landAngleTolerance = 80f;  // больше -- приземлился боком
     public float groundProbeRadius = 0.3f;
     public float groundCheckExtra = 0.5f;
     public float flipLandGrace = 0.12f;     // столько секунд до конца флипа уже можно приземляться
@@ -76,6 +86,16 @@ public class SkaterController : MonoBehaviour
     [Header("Bail")]
     public float wallBailSpeed = 20f;
     public float bailDamage = 5f;
+
+    [Header("Special")]
+    public float specialPerPoint = 1f / 3500f; // сколько шкалы даёт одно очко трюка
+    public float specialDrain = 0.035f;        // в секунду, пока нет комбо
+    public float specialSpinBoost = 1.25f;
+    public float specialScoreBoost = 1.5f;
+
+    [Header("Juice")]
+    public Material sparkMaterial;             // искры при грайнде (назначает Tools > BeerAndDragon > Apply New Art)
+    public float landShake = 0.22f;            // тряска камеры при жёстком приземлении
 
     [Header("Camera (вид от третьего лица на доске)")]
     public bool thirdPerson = true;
@@ -121,10 +141,14 @@ public class SkaterController : MonoBehaviour
     public int ComboBase => comboBase;
     public int ComboMultiplier => Mathf.Max(1, comboTricks.Count);
     public string LiveTrick { get; private set; }   // то, что делается прямо сейчас (грайнд/грэб/мэньюал)
+    public float Special { get; private set; }       // 0..1
+    public bool SpecialActive { get; private set; }
 
     public event Action<int> ComboLanded;    // сколько очков засчитали
     public event Action<string> BailedEvent;
     public event Action<string> TrickAdded;
+    public event Action<string> LandingRated; // "PERFECT" / "SKETCHY"
+    public event Action SpecialReady;
 
     private Rigidbody rb;
     private float halfHeight = 1f;
@@ -153,6 +177,9 @@ public class SkaterController : MonoBehaviour
     private float lastMouseTime;
 
     private float spinAccum;
+    private float spinVel;
+    private int airFlipIndex = -1;     // индекс флипа этого прыжка в комбо -- к нему добавится спин ("360 Kickflip")
+    private int airComboStart;
     private float flipEndTime;
     private Vector3 procEuler;
     private float procStart, procDuration;
@@ -178,7 +205,12 @@ public class SkaterController : MonoBehaviour
     private float balanceTimer;
 
     private readonly List<string> comboTricks = new List<string>();
+    private readonly Dictionary<string, int> trickRepeats = new Dictionary<string, int>();
+    private static readonly float[] RepeatDecay = { 1f, 0.75f, 0.5f, 0.25f, 0.1f };
     private int comboBase;
+
+    private ParticleSystem sparks;
+    private float shakeStart = -10f, shakeAmount;
 
     private Vector3 camLocalPos;
     private Vector3 modelLocalPos;
@@ -228,9 +260,15 @@ public class SkaterController : MonoBehaviour
     {
         if (FindFirstObjectByType<SkateHUD>() == null)
             new GameObject("SkateHUD").AddComponent<SkateHUD>();
+
+        int rails = GrindRail.BuildForLayer(LayerMask.NameToLayer(GrindRail.LayerName));
+        if (rails > 0) GameLog.Info("Skate", $"Линий грайнда со слоя {GrindRail.LayerName}: {rails}");
+        sparks = CreateSparks();
     }
 
     private float SpeedMult => effects != null ? effects.SpeedMultiplier : 1f;
+    private float SpinBoost => SpecialActive ? specialSpinBoost : 1f;
+    private bool OllieReady => CurrentState != State.Ground || Time.time - landTime >= ollieCooldown;
 
     // ================= Update: ввод =================
 
@@ -255,6 +293,7 @@ public class SkaterController : MonoBehaviour
             return;
         }
         NearbyBoard = null;
+        UpdateSpecial();
         if (locked) return;
 
         // Олли: держим -- копим, отпускаем -- прыгаем
@@ -263,7 +302,7 @@ public class SkaterController : MonoBehaviour
         {
             float charge = Mathf.Clamp01((Time.time - ollieChargeStart) / ollieChargeTime);
             ollieChargeStart = -1f;
-            if (CurrentState != State.Air) Ollie(charge);
+            if (CurrentState != State.Air && OllieReady) Ollie(charge);
         }
 
         switch (CurrentState)
@@ -290,7 +329,11 @@ public class SkaterController : MonoBehaviour
 
             case State.Air:
                 if (Input.GetKeyDown(grindKey)) lastGrindPress = Time.time;
-                if (Input.GetKeyDown(flipKey)) TryFlip();
+                if (Input.GetKeyDown(flipKey))
+                {
+                    if (SpecialActive && Input.GetKey(grabKey)) TrySpecial();
+                    else TryFlip();
+                }
                 UpdateGrab();
                 break;
 
@@ -362,7 +405,12 @@ public class SkaterController : MonoBehaviour
 
     private void AirMove()
     {
-        float spin = steer * airSpinSpeed * Time.fixedDeltaTime;
+        // Спин с инерцией: раскручивается и гаснет постепенно, поэтому за обычный прыжок
+        // выходит 180-360, а 540+ -- только с хорошего вылета или с разгоном спина на олли.
+        float dt = Time.fixedDeltaTime;
+        float rate = Mathf.Abs(steer) > 0.1f ? airSpinAccel : airSpinDecel;
+        spinVel = Mathf.MoveTowards(spinVel, steer * airSpinMaxSpeed * SpinBoost, rate * dt);
+        float spin = spinVel * dt;
         spinAccum += spin;
         heading = Quaternion.AngleAxis(spin, Vector3.up) * heading;
 
@@ -509,6 +557,8 @@ public class SkaterController : MonoBehaviour
         if (!IsRiding) return;
         GameLog.Info("Skate", "Бэйл: " + reason);
         LoseCombo();
+        Special = 0f;
+        SpecialActive = false;
         BailedEvent?.Invoke(reason);
         Dismount(true);
         if (health != null && bailDamage > 0f) health.TakeDamage(bailDamage);
@@ -525,6 +575,7 @@ public class SkaterController : MonoBehaviour
         Vector3 v = CurrentState == State.Ground ? lastGroundForward * Speed : rb.linearVelocity;
         v.y = Mathf.Max(v.y, 0f) + up;
         EnterAir(v);
+        spinVel = steer * spinPrewind * SpinBoost;   // A/D зажаты на отрыве -- вылетаем уже крутясь
         if (Board != null) Board.PlayClip(Board.ollieClip);
     }
 
@@ -534,6 +585,9 @@ public class SkaterController : MonoBehaviour
         rb.useGravity = true;
         CurrentState = State.Air;
         spinAccum = 0f;
+        spinVel = 0f;
+        airFlipIndex = -1;
+        airComboStart = comboTricks.Count;
         groundIgnoreUntil = Time.time + 0.15f;
     }
 
@@ -552,10 +606,12 @@ public class SkaterController : MonoBehaviour
         Vector3 flatXZ = Vector3.ProjectOnPlane(flat, Vector3.up);
         Vector3 headXZ = Vector3.ProjectOnPlane(heading, Vector3.up).normalized;
 
+        string rating = null;
         if (flatXZ.magnitude > 1f)
         {
             float angle = Vector3.Angle(headXZ, flatXZ);
-            if (angle > landAngleTolerance && angle < 180f - landAngleTolerance)
+            float dev = Mathf.Min(angle, 180f - angle);   // приземлиться фейки -- тоже ровно
+            if (dev > landAngleTolerance)
             {
                 if (flatXZ.magnitude > sidewaysBailSpeed * SpeedMult)
                 {
@@ -564,6 +620,17 @@ public class SkaterController : MonoBehaviour
                 }
                 rb.linearVelocity *= 0.5f; // медленно -- просто "поймал" доску и потерял скорость
                 flat *= 0.5f;
+                rating = "SKETCHY";
+            }
+            else if (dev > sketchyLandAngle)
+            {
+                rb.linearVelocity *= 0.75f;
+                flat *= 0.75f;
+                rating = "SKETCHY";
+            }
+            else if (dev <= perfectLandAngle)
+            {
+                rating = "PERFECT";
             }
             heading = flatXZ.normalized;   // фейки/нормально -- неважно, едем по скорости
         }
@@ -572,8 +639,23 @@ public class SkaterController : MonoBehaviour
         if (spinDeg >= 150f)
         {
             int deg = Mathf.RoundToInt(spinDeg / 180f) * 180;
-            AddTrick($"{(spinAccum > 0 ? "FS" : "BS")} {deg}", deg / 180 * 150);
+            int spinPoints = deg / 180 * 150;
+            if (airFlipIndex >= 0 && airFlipIndex < comboTricks.Count)
+            {
+                // Спин + флип в одном прыжке -- один трюк "360 Kickflip"
+                comboTricks[airFlipIndex] = $"{deg} {comboTricks[airFlipIndex]}";
+                comboBase += ScaledPoints(spinPoints, 0);
+            }
+            else AddTrick($"{(spinAccum > 0 ? "FS" : "BS")} {deg}", spinPoints);
         }
+
+        bool didTricks = comboTricks.Count > airComboStart;
+        if (rating == "PERFECT" && didTricks) comboBase += Mathf.RoundToInt(comboBase * 0.1f);
+        else if (rating == "SKETCHY" && didTricks) comboBase = Mathf.RoundToInt(comboBase * 0.75f);
+        if (rating != null && (didTricks || rating == "SKETCHY")) LandingRated?.Invoke(rating);
+
+        shakeAmount = landShake * Mathf.Clamp01(-lastVelocity.y / 12f);
+        shakeStart = Time.time;
 
         Speed = flat.magnitude;
         groundNormal = hit.normal;
@@ -665,6 +747,8 @@ public class SkaterController : MonoBehaviour
     private void ResetTrickState()
     {
         spinAccum = 0f;
+        spinVel = 0f;
+        airFlipIndex = -1;
         flipEndTime = 0f;
         procDuration = 0f;
         grabbing = false;
@@ -710,6 +794,34 @@ public class SkaterController : MonoBehaviour
         flipStartTime = Time.time;
         flipDuration = duration;
         AddTrick(name, points);
+        airFlipIndex = comboTricks.Count - 1;
+    }
+
+    // Спец-трюк: шкала полная, ПКМ зажата, ЛКМ + направление. Долгий -- не докрутил до земли = бэйл.
+    private void TrySpecial()
+    {
+        if (Time.time < flipEndTime) return;
+        EndGrab();
+        Vector2 d = DirInput();
+
+        string name;
+        int points;
+        Vector3 euler;
+        if (d.y > 0.5f) { name = "Святой Грааль"; points = 2000; euler = new Vector3(-360f, 360f, 0f); }
+        else if (d.y < -0.5f) { name = "Экскалибур"; points = 2000; euler = new Vector3(360f, 0f, 360f); }
+        else if (d.x < -0.5f) { name = "Драконий Варил"; points = 1800; euler = new Vector3(0f, 540f, 360f); }
+        else if (d.x > 0.5f) { name = "Рыцарский Крест"; points = 2200; euler = new Vector3(0f, 0f, -720f); }
+        else { name = "Пивной Кикфлип"; points = 1500; euler = new Vector3(0f, 0f, 720f); }
+
+        const float duration = 0.7f;
+        procEuler = euler;
+        procStart = Time.time;
+        procDuration = duration;
+        flipEndTime = Time.time + duration;
+        flipStartTime = Time.time;
+        flipDuration = duration;
+        AddTrick(name, points);
+        airFlipIndex = -1;   // к спец-трюку спин не приклеиваем -- он идёт отдельным трюком
     }
 
     private void UpdateGrab()
@@ -872,9 +984,39 @@ public class SkaterController : MonoBehaviour
 
     private void AddTrick(string name, int points)
     {
+        trickRepeats.TryGetValue(name, out int repeats);
+        trickRepeats[name] = repeats + 1;
+        int value = ScaledPoints(points, repeats);
         comboTricks.Add(name);
-        comboBase += points;
+        comboBase += value;
+        AddSpecial(value);
         TrickAdded?.Invoke(name);
+    }
+
+    // Повтор того же трюка в комбо стоит всё меньше; со спец-шкалой -- больше
+    private int ScaledPoints(int points, int repeats)
+    {
+        float decay = RepeatDecay[Mathf.Min(repeats, RepeatDecay.Length - 1)];
+        return Mathf.RoundToInt(points * decay * (SpecialActive ? specialScoreBoost : 1f));
+    }
+
+    private void AddSpecial(int points)
+    {
+        Special = Mathf.Min(1f, Special + points * specialPerPoint);
+        if (Special >= 1f && !SpecialActive)
+        {
+            SpecialActive = true;
+            GameLog.Verbose("Skate", "Спец-шкала заполнена");
+            SpecialReady?.Invoke();
+        }
+    }
+
+    // Шкала понемногу утекает, пока не трюкуешь; спец пропадает, когда её осталось мало
+    private void UpdateSpecial()
+    {
+        if (comboTricks.Count > 0 || BalanceActive || CurrentState == State.Air) return;
+        Special = Mathf.Max(0f, Special - specialDrain * Time.deltaTime);
+        if (SpecialActive && Special < 0.35f) SpecialActive = false;
     }
 
     private void TryBankCombo()
@@ -890,6 +1032,7 @@ public class SkaterController : MonoBehaviour
         TotalScore += value;
         GameLog.Verbose("Skate", $"Комбо засчитано: {value} ({comboTricks.Count} трюков)");
         comboTricks.Clear();
+        trickRepeats.Clear();
         comboBase = 0;
         ComboLanded?.Invoke(value);
     }
@@ -897,6 +1040,7 @@ public class SkaterController : MonoBehaviour
     private void LoseCombo()
     {
         comboTricks.Clear();
+        trickRepeats.Clear();
         comboBase = 0;
         LiveTrick = null;
     }
@@ -905,6 +1049,7 @@ public class SkaterController : MonoBehaviour
 
     void LateUpdate()
     {
+        UpdateSparks();
         if (!IsRiding) return;
         float dt = Time.deltaTime;
 
@@ -982,5 +1127,66 @@ public class SkaterController : MonoBehaviour
             if (h.distance > 0f && h.distance < dist) dist = h.distance;
         }
         cam.position = pivot + back * Mathf.Max(0.5f, dist - 0.1f);
+
+        // Жёсткое приземление -- короткая затухающая тряска
+        float shakeT = (Time.time - shakeStart) / 0.25f;
+        if (shakeT < 1f && shakeAmount > 0f)
+            cam.position += UnityEngine.Random.insideUnitSphere * (shakeAmount * (1f - shakeT));
+    }
+
+    // ================= Искры при грайнде =================
+
+    private ParticleSystem CreateSparks()
+    {
+        GameObject go = new GameObject("GrindSparks");
+        go.transform.SetParent(transform, false);
+        ParticleSystem ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        ParticleSystem.MainModule main = ps.main;
+        main.duration = 1f;
+        main.loop = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.15f, 0.4f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(2f, 5.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.02f, 0.05f);
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.85f, 0.35f), new Color(1f, 0.45f, 0.1f));
+        main.gravityModifier = 1.5f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 300;
+
+        ParticleSystem.EmissionModule emission = ps.emission;
+        emission.rateOverTime = 0f;
+
+        ParticleSystem.ShapeModule shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle = 35f;
+        shape.radius = 0.05f;
+
+        ParticleSystem.SizeOverLifetimeModule size = ps.sizeOverLifetime;
+        size.enabled = true;
+        size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+
+        ParticleSystemRenderer r = go.GetComponent<ParticleSystemRenderer>();
+        r.renderMode = ParticleSystemRenderMode.Stretch;
+        r.lengthScale = 2f;
+        r.velocityScale = 0.04f;
+        if (sparkMaterial != null) r.sharedMaterial = sparkMaterial;
+
+        ps.Play();
+        return ps;
+    }
+
+    private void UpdateSparks()
+    {
+        if (sparks == null) return;
+        bool on = CurrentState == State.Grind;
+        ParticleSystem.EmissionModule emission = sparks.emission;
+        emission.rateOverTime = on ? 40f + grindSpeed * 6f : 0f;
+        if (!on) return;
+
+        // Летят назад-вверх из-под доски
+        Vector3 back = -heading;
+        sparks.transform.SetPositionAndRotation(BoardGroundPosition,
+            Quaternion.LookRotation((back + Vector3.up * 0.6f).normalized));
     }
 }

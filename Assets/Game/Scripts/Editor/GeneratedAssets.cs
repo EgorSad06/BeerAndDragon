@@ -78,7 +78,7 @@ public static class GeneratedAssets
         ti.SaveAndReimport();
     }
 
-    static void SavePng(Texture2D tex, string path, bool sprite, bool point)
+    public static void SavePng(Texture2D tex, string path, bool sprite, bool point)
     {
         EnsureFolder(Path.GetDirectoryName(path).Replace('\\', '/'));
         File.WriteAllBytes(path, tex.EncodeToPNG());
