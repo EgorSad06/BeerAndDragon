@@ -118,7 +118,7 @@ public class Weapon : MonoBehaviour
     public AudioSource audioSource;
     public AudioClip fireSound;
     public AudioClip reloadSound;
-    public AudioClip emptySound;
+    public AudioClip emptySound;            // не назначен -- щелчок генерируется в коде (FR-WPN-03.1)
 
     [Header("Bullet holes (decals)")]
     public GameObject bulletHolePrefab;
@@ -163,6 +163,7 @@ public class Weapon : MonoBehaviour
         }
         if (cameraLook == null) cameraLook = GetComponentInParent<CameraPOV>();
         if (playerBody == null && owner != null) playerBody = owner.GetComponent<Rigidbody>();
+        if (emptySound == null) emptySound = DefaultEmptyClick;
 
         if (recoilTransform != null)
         {
@@ -255,6 +256,7 @@ public class Weapon : MonoBehaviour
 
         if (currentAmmo <= 0)
         {
+            nextFireTime = Time.time + EmptyClickInterval; // в автоматическом режиме не щёлкать каждый кадр
             PlayEmptyFeedback();
             if (autoReloadWhenEmpty) TryStartReload();
             return;
@@ -321,6 +323,30 @@ public class Weapon : MonoBehaviour
     }
 
     // Множитель урона от дистанции: до start -- 1, после end -- minMultiplier, между -- линейно
+    public const float EmptyClickInterval = 0.2f;
+
+    private static AudioClip defaultEmptyClick;
+    private static AudioClip DefaultEmptyClick => defaultEmptyClick != null ? defaultEmptyClick : (defaultEmptyClick = CreateEmptyClick());
+
+    // Щелчок пустого оружия: 50 мс -- удар бойка (короткий шум) + металлический призвук 2,2 кГц,
+    // оба быстро затухают. Шум с фиксированным seed, чтобы звук был одинаковым при каждом запуске.
+    public static AudioClip CreateEmptyClick(int sampleRate = 44100)
+    {
+        int length = Mathf.Max(1, sampleRate / 20);
+        float[] data = new float[length];
+        System.Random rng = new System.Random(7);
+        for (int i = 0; i < length; i++)
+        {
+            float t = (float)i / sampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-t * 900f);
+            float ring = Mathf.Sin(2f * Mathf.PI * 2200f * t) * Mathf.Exp(-t * 120f);
+            data[i] = Mathf.Clamp(0.6f * noise + 0.35f * ring, -1f, 1f);
+        }
+        AudioClip clip = AudioClip.Create("EmptyClick", length, 1, sampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
     public static float FalloffMultiplier(float distance, float start, float end, float minMultiplier)
     {
         if (end <= start) return 1f;
