@@ -173,13 +173,13 @@ public class Weapon : MonoBehaviour
         }
         if (cameraLook == null) cameraLook = GetComponentInParent<CameraPOV>();
         if (playerBody == null && owner != null) playerBody = owner.GetComponent<Rigidbody>();
-        if (emptySound == null) emptySound = DefaultEmptyClick;
 
         if (recoilTransform != null)
         {
             kickRestPos = recoilTransform.localPosition;
             kickRestRot = recoilTransform.localRotation;
         }
+        GameLog.Verbose("Weapon", $"{name}: Awake, пул декалей...");
         SetupBulletHoles();
     }
 
@@ -206,6 +206,7 @@ public class Weapon : MonoBehaviour
             maxDecals, PoolOverflow.ReuseOldest,
             onGet: go => go.SetActive(true),
             onRelease: go => go.SetActive(false));
+        GameLog.Verbose("Weapon", $"{name}: заготовка {maxDecals} декалей");
         pool.Prewarm(maxDecals);
         bulletHoles = new BulletHoles(pool, decalOffset, decalLifetime, flipDecalNormal);
         GameLog.Verbose("Weapon", $"{name}: пул декалей {pool.GetType().Name}, лимит {maxDecals}");
@@ -526,7 +527,9 @@ public class Weapon : MonoBehaviour
     {
         if (animator != null)
             animator.SetTrigger(emptyTrigger);
-        if (audioSource != null && emptySound != null)
-            audioSource.PlayOneShot(emptySound);
+        if (audioSource == null) return;
+        // Щелчок создаётся при первом использовании, а не в Awake: в batchmode (CI, без аудиоустройства) он не нужен
+        if (emptySound == null && !Application.isBatchMode) emptySound = DefaultEmptyClick;
+        if (emptySound != null) audioSource.PlayOneShot(emptySound);
     }
 }
