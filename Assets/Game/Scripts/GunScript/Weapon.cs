@@ -119,8 +119,8 @@ public class Weapon : MonoBehaviour
     public GameObject impactPrefab;
     public float impactLifetime = 1f;
     public AudioSource audioSource;
-    public AudioClip fireSound;
-    public AudioClip reloadSound;
+    public AudioClip fireSound;             // не назначен -- выстрел генерируется в коде (WeaponSounds)
+    public AudioClip reloadSound;           // не назначен -- перезарядка генерируется в коде (WeaponSounds)
     public AudioClip emptySound;            // не назначен -- щелчок генерируется в коде (FR-WPN-03.1)
 
     [Header("Bullet holes (decals)")]
@@ -491,8 +491,9 @@ public class Weapon : MonoBehaviour
 
     private void PlayReloadSound()
     {
-        if (audioSource != null && reloadSound != null)
-            audioSource.PlayOneShot(reloadSound);
+        AudioClip clip = reloadSound != null ? reloadSound : (Application.isBatchMode ? null : WeaponSounds.Reload);
+        if (audioSource != null && clip != null)
+            audioSource.PlayOneShot(clip);
     }
 
     private IEnumerator CycleRoutine()
@@ -513,8 +514,10 @@ public class Weapon : MonoBehaviour
         if (animator != null)
             animator.SetTrigger(fireTrigger);
 
-        if (audioSource != null && fireSound != null)
-            audioSource.PlayOneShot(fireSound);
+        // Звук не назначен -- сгенерированный (WeaponSounds), в batchmode без звука
+        AudioClip shot = fireSound != null ? fireSound : (Application.isBatchMode ? null : WeaponSounds.RandomShot());
+        if (audioSource != null && shot != null)
+            audioSource.PlayOneShot(shot);
 
         if (muzzleFlashPrefab != null && muzzlePoint != null)
         {

@@ -39,9 +39,7 @@ public class GameHUD : MonoBehaviour
     public Sprite hpEmpty, hpFill, hpTrail;       // полоски 42x5, внутри рамки со сдвигом (3, 3)
     public Sprite smallFrame;
     public Sprite smallEmpty, boostFill, specialFill; // полоски 34x5, внутри рамки со сдвигом (4, 3)
-    public Sprite[] speedSteps;                   // лесенка спидометра: от пустой до полной
     public int pixelScale = 7;                    // во сколько раз увеличиваем пиксели
-    public float speedometerMax = 30f;            // м/с, при которых лесенка полная
 
     public bool HasPixelBars => hpFrame != null && hpEmpty != null && hpFill != null;
 
@@ -68,12 +66,6 @@ public class GameHUD : MonoBehaviour
     private Image boostFillImage;
     private Text boostText;
 
-    private Rigidbody playerBody;
-    private Image speedImage;
-    private Text speedText;
-    private float shownSpeed;
-    private int lastKmh = -1;
-
     private GameObject ammoRoot;
     private Text ammoMagText, ammoReserveText, reloadText;
     private Transform lastWeaponTransform;
@@ -98,7 +90,6 @@ public class GameHUD : MonoBehaviour
         if (health == null) health = FindFirstObjectByType<PlayerHealth>();
         if (effects == null) effects = FindFirstObjectByType<PlayerStatusEffects>();
         if (weaponSwitcher == null) weaponSwitcher = FindFirstObjectByType<WeaponSwitcher>(FindObjectsInactive.Include);
-        if (health != null) playerBody = health.GetComponent<Rigidbody>();
 
         EnsureEventSystem();
         BuildCanvas();
@@ -106,7 +97,6 @@ public class GameHUD : MonoBehaviour
         BuildDamageFlash();
         if (HasPixelBars) BuildPixelHealth();
         else BuildHealth();
-        BuildSpeedometer();
         BuildAmmo();
         BuildMessages();
         BuildInventory();
@@ -145,7 +135,6 @@ public class GameHUD : MonoBehaviour
     {
         UpdateHealth();
         UpdateBoost();
-        UpdateSpeedometer();
         UpdateAmmo();
         UpdateMessages();
         AnimateBag();
@@ -234,10 +223,7 @@ public class GameHUD : MonoBehaviour
         boostText = NewText("Text", b, 18, TextAnchor.LowerLeft, boostColor);
         Place(boostText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(150f, 16f), new Vector2(300f, 24f));
         boostRoot.SetActive(false);
-        hudRightOfHealth = 32f + w;
     }
-
-    private float hudRightOfHealth = 452f;   // правый край блока здоровья -- от него ставим спидометр
 
     // HP из Pixel UI pack: рамка 48x11, внутри полоска 42x5 со сдвигом (3, 3). Пиксели увеличены в pixelScale раз.
     private void BuildPixelHealth()
@@ -288,28 +274,6 @@ public class GameHUD : MonoBehaviour
             Place(boostText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(150f, 16f), new Vector2(300f, 24f));
             boostRoot.SetActive(false);
         }
-
-        hudRightOfHealth = 32f + frameSize.x;
-    }
-
-    // Спидометр: пиксельная лесенка (горит больше ступенек -- быстрее) + км/ч
-    private void BuildSpeedometer()
-    {
-        RectTransform box = NewRect("Speedometer", root);
-        float k = pixelScale * 0.75f;
-        Vector2 stepsSize = new Vector2(37f, 14f) * k;
-        Place(box, Vector2.zero, Vector2.zero, new Vector2(hudRightOfHealth + 40f, 36f) + stepsSize * 0.5f, stepsSize);
-
-        if (speedSteps != null && speedSteps.Length > 0 && speedSteps[0] != null)
-            speedImage = PixelImage("Steps", box, speedSteps[0], Vector2.zero, stepsSize);
-
-        speedText = NewText("Speed", box, 40, TextAnchor.LowerLeft, Color.white);
-        speedText.fontStyle = FontStyle.Bold;
-        Place(speedText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(110f, 30f), new Vector2(180f, 60f));
-
-        Text label = NewText("Label", box, 20, TextAnchor.LowerLeft, new Color(1f, 0.85f, 0.7f));
-        label.text = "СКОРОСТЬ";
-        Place(label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(100f, 14f), new Vector2(200f, 24f));
     }
 
     private Image PixelImage(string name, RectTransform parent, Sprite sprite, Vector2 bottomLeft, Vector2 size)
@@ -544,28 +508,6 @@ public class GameHUD : MonoBehaviour
         if (boostFillImage != null) boostFillImage.fillAmount = v;
         else FillRect(boostFillRect, v);
         boostText.text = $"ЭНЕРГЕТИК  x{effects.SpeedMultiplier:0.#}  {effects.SpeedBoostRemaining:0.0}с";
-    }
-
-    private void UpdateSpeedometer()
-    {
-        if (speedText == null || playerBody == null) return;
-        Vector3 v = playerBody.linearVelocity;
-        v.y = 0f;
-        shownSpeed = Mathf.Lerp(shownSpeed, v.magnitude, Time.deltaTime * 8f);
-
-        float t = Mathf.Clamp01(shownSpeed / Mathf.Max(1f, speedometerMax));
-        if (speedImage != null)
-        {
-            int i = Mathf.Clamp(Mathf.RoundToInt(t * (speedSteps.Length - 1)), 0, speedSteps.Length - 1);
-            if (speedSteps[i] != null && speedImage.sprite != speedSteps[i]) speedImage.sprite = speedSteps[i];
-        }
-        int kmh = Mathf.RoundToInt(shownSpeed * 3.6f);
-        if (kmh != lastKmh)
-        {
-            lastKmh = kmh;
-            speedText.text = kmh + " <size=22>км/ч</size>";
-        }
-        speedText.color = Color.Lerp(Color.white, new Color(1f, 0.45f, 0.2f), Mathf.InverseLerp(0.6f, 1f, t));
     }
 
     private void UpdateAmmo()

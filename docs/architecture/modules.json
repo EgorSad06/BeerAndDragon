@@ -35,7 +35,7 @@
       "id": "Weapons", "status": "работает", "author": "EgorSad06", "layer": "gameplay",
       "responsibility": "Стрельба, меч, переключение оружия; точка сборки пула декалей",
       "contract": "Weapon: магазин, перезарядка, AddAmmo; WeaponSwitcher.Equip(name); Damageable",
-      "files": ["Assets/Game/Scripts/GunScript/Weapon.cs", "Assets/Game/Scripts/GunScript/AmmoMagazine.cs", "Assets/Game/Scripts/GunScript/Sword.cs", "Assets/Game/Scripts/GunScript/WeaponSwitcher.cs", "Assets/Game/Scripts/GunScript/WeaponSway.cs", "Assets/Game/Scripts/GunScript/Damageable.cs", "Assets/Game/Scripts/GunScript/RandomSpin.cs"],
+      "files": ["Assets/Game/Scripts/GunScript/Weapon.cs", "Assets/Game/Scripts/GunScript/AmmoMagazine.cs", "Assets/Game/Scripts/GunScript/WeaponSounds.cs", "Assets/Game/Scripts/GunScript/Sword.cs", "Assets/Game/Scripts/GunScript/WeaponSwitcher.cs", "Assets/Game/Scripts/GunScript/WeaponSway.cs", "Assets/Game/Scripts/GunScript/Damageable.cs", "Assets/Game/Scripts/GunScript/RandomSpin.cs"],
       "location": "Assets/Game/Scripts/GunScript/",
       "dependsOn": ["BulletHoles", "ObjectPool", "Config", "Diagnostics", "Items", "Movement", "Player"]
     },

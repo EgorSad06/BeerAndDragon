@@ -52,8 +52,8 @@ public static class ArtUpgradeTool
 
     public static void PixelUi()
     {
-        string bars = UiDir + "/04.png", steps = UiDir + "/05.png";
-        if (!File.Exists(bars) || !File.Exists(steps))
+        string bars = UiDir + "/04.png";
+        if (!File.Exists(bars))
         {
             Debug.LogWarning("[Art] Нет Pixel UI pack 3 -- HUD остаётся прежним");
             return;
@@ -76,12 +76,6 @@ public static class ArtUpgradeTool
         hud.smallEmpty = Crop(bars, new RectInt(295, 70, 34, 5), "UI_SmallEmpty");
         hud.boostFill = Crop(bars, new RectInt(55, 118, 34, 5), "UI_BoostFill");  // зелёная
         hud.specialFill = Crop(bars, new RectInt(55, 86, 34, 5), "UI_SpecialFill"); // жёлтая
-
-        // Лесенка: в листе слева направо от полной к пустой, в HUD нужна от пустой к полной
-        const int frames = 8;
-        hud.speedSteps = new Sprite[frames];
-        for (int i = 0; i < frames; i++)
-            hud.speedSteps[frames - 1 - i] = Crop(steps, new RectInt(5 + 48 * i, 2, 37, 14), "UI_Speed" + (frames - 1 - i));
         EditorUtility.SetDirty(hud);
     }
 
