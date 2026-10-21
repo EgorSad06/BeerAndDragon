@@ -92,11 +92,14 @@ public class Weapon : MonoBehaviour
     public bool reloadOneByOne = false;     // заряжать по одному патрону (помпа); выстрел прерывает
     public bool autoReloadWhenEmpty = true;
     public KeyCode reloadKey = KeyCode.R;
-    private int currentAmmo;
-    private bool isReloading;
     private bool isCycling;
     private bool manualChambered = true;
-    private Coroutine reloadRoutine;
+
+    // Правила магазина и запаса -- в AmmoMagazine (чистый C#, тестируется без сцены). Поля выше -- только настройки;
+    // магазин создаётся из них при первом обращении (в EditMode-тестах Awake не вызывается).
+    private AmmoMagazine ammo;
+    private AmmoMagazine Ammo => ammo ??= new AmmoMagazine(magazineSize, reserveAmmo, maxReserveAmmo, reloadTime,
+                                                           infiniteReserve, reloadOneByOne);
 
     [Header("Aim / Muzzle")]
     public Transform aimOrigin;             // камера; если пусто -- найдётся сама
@@ -139,12 +142,12 @@ public class Weapon : MonoBehaviour
     public string cycleTrigger = "Cycle";
     public string emptyTrigger = "Empty";
 
-    public int CurrentAmmo => currentAmmo;
-    public int ReserveAmmo => reserveAmmo;
+    public int CurrentAmmo => Ammo.Magazine;
+    public int ReserveAmmo => Ammo.Reserve;
     public int MagazineSize => magazineSize;
     public int MaxReserveAmmo => maxReserveAmmo;
     public bool InfiniteReserve => infiniteReserve;
-    public bool IsReloading => isReloading;
+    public bool IsReloading => Ammo.IsReloading;
 
     private float FireCooldown => 60f / Mathf.Max(1f, roundsPerMinute);
 
@@ -152,7 +155,14 @@ public class Weapon : MonoBehaviour
 
     void Awake()
     {
-        currentAmmo = magazineSize;
+        // FR-WPN-04.1: неверные настройки магазина -- ошибка в журнал, оружие выключено, игра продолжается
+        try { ammo = new AmmoMagazine(magazineSize, reserveAmmo, maxReserveAmmo, reloadTime, infiniteReserve, reloadOneByOne); }
+        catch (System.ArgumentOutOfRangeException e)
+        {
+            GameLog.Error("Weapon", $"{name}: {e.Message}");
+            enabled = false;
+            return;
+        }
 
         if (owner == null) owner = transform.root;
         if (aimOrigin == null)
@@ -202,12 +212,11 @@ public class Weapon : MonoBehaviour
     }
 
     // Переключение оружия выключает объект -- прерываем перезарядку/передёргивание,
-    // иначе корутина умрёт на середине и isReloading залипнет в true.
+    // иначе перезарядка продолжилась бы в выключенном оружии.
     void OnDisable()
     {
         StopAllCoroutines();
-        reloadRoutine = null;
-        isReloading = false;
+        Ammo.CancelReload();
         if (isCycling) { isCycling = false; manualChambered = true; }
         kickCurrent = kickTarget = Vector3.zero;
         tiltCurrent = Quaternion.identity;
@@ -220,6 +229,7 @@ public class Weapon : MonoBehaviour
 
     void Update()
     {
+        TickReload();
         HandleInput();
         bulletHoles?.Tick(Time.time);
         currentSpreadBloom = Mathf.Max(0f, currentSpreadBloom - spreadRecoverySpeed * Time.deltaTime);
@@ -235,10 +245,10 @@ public class Weapon : MonoBehaviour
             : Input.GetKeyDown(fireKey);
 
         // Помпу можно прервать выстрелом, если хоть один патрон уже зарядили
-        if (isReloading && reloadOneByOne && wantsToFire && currentAmmo > 0)
-            CancelReload();
+        if (Ammo.IsReloading && reloadOneByOne && wantsToFire && Ammo.Magazine > 0)
+            Ammo.CancelReload();
 
-        if (isReloading) return;
+        if (Ammo.IsReloading) return;
 
         if (Input.GetKeyDown(reloadKey))
             TryStartReload();
@@ -252,29 +262,32 @@ public class Weapon : MonoBehaviour
 
     private void TryFire()
     {
-        if (isReloading || isCycling || Time.time < nextFireTime) return;
+        if (isCycling || Time.time < nextFireTime) return;
 
-        if (currentAmmo <= 0)
+        if (fireMode == FireMode.Manual && !manualChambered && Ammo.Magazine > 0 && !Ammo.IsReloading)
         {
-            nextFireTime = Time.time + EmptyClickInterval; // в автоматическом режиме не щёлкать каждый кадр
             PlayEmptyFeedback();
-            if (autoReloadWhenEmpty) TryStartReload();
             return;
         }
 
-        if (fireMode == FireMode.Manual && !manualChambered)
+        switch (Ammo.TryFire())
         {
-            PlayEmptyFeedback();
-            return;
+            case FireResult.Blocked:
+                return;
+            case FireResult.Empty:
+                nextFireTime = Time.time + EmptyClickInterval; // в автоматическом режиме не щёлкать каждый кадр
+                PlayEmptyFeedback();
+                if (autoReloadWhenEmpty) TryStartReload();
+                return;
         }
 
         Fire();
     }
 
+    // Патрон уже списан в Ammo.TryFire
     private void Fire()
     {
         nextFireTime = Time.time + FireCooldown;
-        currentAmmo--;
 
         if (fireMode == FireMode.Manual)
         {
@@ -297,7 +310,7 @@ public class Weapon : MonoBehaviour
         ApplyRecoil(forward);
         PlayFireFeedback();
 
-        if (currentAmmo <= 0 && autoReloadWhenEmpty)
+        if (Ammo.Magazine <= 0 && autoReloadWhenEmpty)
             TryStartReload();
     }
 
@@ -451,7 +464,7 @@ public class Weapon : MonoBehaviour
         kickCurrent = Vector3.Lerp(kickCurrent, kickTarget, Time.deltaTime * viewKickSnappiness);
         kickTarget = Vector3.Lerp(kickTarget, Vector3.zero, Time.deltaTime * viewKickReturnSpeed);
 
-        Quaternion tiltTarget = isReloading ? Quaternion.Euler(reloadTiltEuler) : Quaternion.identity;
+        Quaternion tiltTarget = Ammo.IsReloading ? Quaternion.Euler(reloadTiltEuler) : Quaternion.identity;
         tiltCurrent = Quaternion.Slerp(tiltCurrent, tiltTarget, Time.deltaTime * reloadTiltSpeed);
 
         if (recoilTransform == null) return;
@@ -461,52 +474,24 @@ public class Weapon : MonoBehaviour
 
     private void TryStartReload()
     {
-        if (isReloading || currentAmmo >= magazineSize) return;
-        if (!infiniteReserve && reserveAmmo <= 0) return;
-        reloadRoutine = StartCoroutine(ReloadRoutine());
-    }
-
-    private void CancelReload()
-    {
-        if (reloadRoutine != null) StopCoroutine(reloadRoutine);
-        reloadRoutine = null;
-        isReloading = false;
-    }
-
-    private IEnumerator ReloadRoutine()
-    {
-        isReloading = true;
+        if (!Ammo.TryStartReload(Time.time)) return;
         if (animator != null)
             animator.SetTrigger(reloadTrigger);
+        PlayReloadSound();
+    }
 
-        if (reloadOneByOne)
-        {
-            while (currentAmmo < magazineSize && (infiniteReserve || reserveAmmo > 0))
-            {
-                if (audioSource != null && reloadSound != null)
-                    audioSource.PlayOneShot(reloadSound);
-                yield return new WaitForSeconds(reloadTime);
-                currentAmmo++;
-                if (!infiniteReserve) reserveAmmo--;
-            }
-        }
-        else
-        {
-            if (audioSource != null && reloadSound != null)
-                audioSource.PlayOneShot(reloadSound);
-            yield return new WaitForSeconds(reloadTime);
+    private void TickReload()
+    {
+        int loaded = Ammo.Tick(Time.time);
+        if (loaded <= 0) return;
+        if (Ammo.IsReloading) PlayReloadSound();          // помпа: звук на каждый следующий патрон
+        else if (fireMode == FireMode.Manual) manualChambered = true;
+    }
 
-            int needed = magazineSize - currentAmmo;
-            int toLoad = infiniteReserve ? needed : Mathf.Min(needed, reserveAmmo);
-            currentAmmo += toLoad;
-            if (!infiniteReserve) reserveAmmo -= toLoad;
-        }
-
-        if (fireMode == FireMode.Manual)
-            manualChambered = true;
-
-        isReloading = false;
-        reloadRoutine = null;
+    private void PlayReloadSound()
+    {
+        if (audioSource != null && reloadSound != null)
+            audioSource.PlayOneShot(reloadSound);
     }
 
     private IEnumerator CycleRoutine()
@@ -520,13 +505,7 @@ public class Weapon : MonoBehaviour
     }
 
     // Возвращает, сколько патронов реально взяли (упёрлись в maxReserveAmmo -- меньше)
-    public int AddAmmo(int amount)
-    {
-        if (infiniteReserve || amount <= 0) return 0;
-        int take = Mathf.Min(amount, Mathf.Max(0, maxReserveAmmo - reserveAmmo));
-        reserveAmmo += take;
-        return take;
-    }
+    public int AddAmmo(int amount) => Ammo.AddAmmo(amount);
 
     private void PlayFireFeedback()
     {

@@ -31,8 +31,8 @@
     },
     {
       "id": "ammo-no-cap",
-      "file": "Assets/Game/Scripts/GunScript/Weapon.cs",
-      "find": "int take = Mathf.Min(amount, Mathf.Max(0, maxReserveAmmo - reserveAmmo));",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "int take = Math.Min(amount, Math.Max(0, MaxReserve - Reserve));",
       "replace": "int take = amount;",
       "what": "коробки патронов игнорируют максимум запаса"
     },
