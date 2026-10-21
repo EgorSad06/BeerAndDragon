@@ -63,6 +63,69 @@
       "find": "            LinkedListNode<T> oldest = order.First;",
       "replace": "            LinkedListNode<T> oldest = order.Last;",
       "what": "LinkedPool при переполнении забирает самый новый объект вместо самого старого"
+    },
+    {
+      "id": "ammo-tick-boundary",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "while (IsReloading && now >= nextLoadAt)",
+      "replace": "while (IsReloading && now > nextLoadAt)",
+      "what": "граница времени перезарядки исключена: ровно через 0,9 с патроны ещё не перенесены (П4)"
+    },
+    {
+      "id": "ammo-reload-when-full",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "if (IsReloading || Magazine >= MagazineSize) return false;",
+      "replace": "if (IsReloading || Magazine > MagazineSize) return false;",
+      "what": "перезарядка начинается при полном магазине (П3, таблица решений Д4)"
+    },
+    {
+      "id": "ammo-reload-empty-reserve",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "if (!InfiniteReserve && Reserve <= 0) return false;",
+      "replace": "if (!InfiniteReserve && Reserve < 0) return false;",
+      "what": "перезарядка начинается при пустом запасе (П2/П3, Д2)"
+    },
+    {
+      "id": "ammo-transfer-ignores-reserve",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "if (!InfiniteReserve) toLoad = Math.Min(toLoad, Reserve);",
+      "replace": "/* дефект: запас не ограничивает перенос */",
+      "what": "перенос в магазин не ограничен запасом -- запас уходит в минус (П4)"
+    },
+    {
+      "id": "ammo-fire-during-reload",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "if (IsReloading) return FireResult.Blocked;",
+      "replace": "/* дефект: нет блокировки выстрела */",
+      "what": "во время перезарядки можно стрелять (П4, переход Перезарядка -> выстрел)"
+    },
+    {
+      "id": "ammo-reload-restarts-timer",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "if (IsReloading || Magazine >= MagazineSize) return false;",
+      "replace": "if (Magazine >= MagazineSize) return false;",
+      "what": "повторное R во время перезарядки перезапускает таймер (П3, Д6, ОП-2)"
+    },
+    {
+      "id": "ammo-negative-box",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "if (InfiniteReserve || amount <= 0) return 0;",
+      "replace": "if (InfiniteReserve) return 0;",
+      "what": "коробка с отрицательным числом патронов уменьшает запас (FR-WPN-04.1)"
+    },
+    {
+      "id": "ammo-default-empty-magazine",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "Magazine = magazineSize;",
+      "replace": "Magazine = 0;",
+      "what": "неверное значение по умолчанию: оружие появляется с пустым магазином (П1)"
+    },
+    {
+      "id": "ammo-pump-catchup",
+      "file": "Assets/Game/Scripts/GunScript/AmmoMagazine.cs",
+      "find": "else nextLoadAt += ReloadTime;",
+      "replace": "else nextLoadAt = now + ReloadTime;",
+      "what": "помпа: после паузы кадра следующий патрон отсчитывается от позднего кадра, а не от момента прошлого патрона (П4, режим по одному)"
     }
   ]
 }
