@@ -165,6 +165,51 @@ namespace BeerAndDragon.Tests
             Assert.IsTrue(m.TryStartReload(10f), "после прерывания перезарядку можно начать снова");
         }
 
+        // ---------- П4, режим «по одному» (помпа). Добавлены по анализу покрытия: ветка продолжения зарядки не выполнялась ----------
+
+        [Test]
+        public void T37_OneByOne_LoadsOneRoundPerInterval()
+        {
+            AmmoMagazine m = WithMagazine(0, 16, oneByOne: true);
+            m.TryStartReload(0f);
+            Assert.AreEqual(1, m.Tick(Reload), "через 0,9 с -- первый патрон");
+            Assert.AreEqual(1, m.Magazine);
+            Assert.IsTrue(m.IsReloading, "магазин неполон -- зарядка продолжается");
+            Assert.AreEqual(0, m.Tick(2 * Reload - 0.001f), "второй патрон ещё не заряжен");
+            Assert.AreEqual(1, m.Tick(2 * Reload), "через 1,8 с -- второй патрон");
+            Assert.AreEqual(2, m.Magazine);
+            Assert.AreEqual(14, m.Reserve);
+            Assert.IsFalse(m.IsReloading, "магазин полон -- зарядка закончена");
+        }
+
+        [Test]
+        public void T38_OneByOne_CancelAfterFirst_KeepsLoadedRound()
+        {
+            AmmoMagazine m = WithMagazine(0, 1, oneByOne: true);
+            m.TryStartReload(0f);
+            m.Tick(Reload);
+            Assert.AreEqual(1, m.Magazine);
+            Assert.IsFalse(m.IsReloading, "запас кончился -- зарядка закончена (граница запаса 1)");
+
+            AmmoMagazine p = WithMagazine(0, 16, oneByOne: true);
+            p.TryStartReload(0f);
+            p.Tick(Reload);
+            p.CancelReload();
+            Assert.AreEqual(1, p.Magazine, "уже заряженный патрон остаётся после прерывания");
+            Assert.AreEqual(0, p.Tick(10f));
+        }
+
+        [Test]
+        public void T39_OneByOne_LongFrame_CatchesUp()
+        {
+            // Кадр длиной 2 с (просадка): за это время прошло два интервала по 0,9 с -- оба патрона заряжены
+            AmmoMagazine m = WithMagazine(0, 16, oneByOne: true);
+            m.TryStartReload(0f);
+            Assert.AreEqual(2, m.Tick(2f));
+            Assert.AreEqual(2, m.Magazine);
+            Assert.IsFalse(m.IsReloading);
+        }
+
         // ---------- П5 (FR-WPN-04): подбор коробки -- классы и границы, предел 40 ----------
 
         [TestCase(16, 8, 8, 24,  TestName = "T20_AddAmmo_FitsCompletely")]

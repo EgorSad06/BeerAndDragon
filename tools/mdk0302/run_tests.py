@@ -59,6 +59,9 @@ def summary(cases, verbose_suite=True):
         for name, result, _ in mine:
             print(f"  {status(result):7} {name[len('BeerAndDragon.Tests.'):]}")
     failed = [c for c in cases if c[1] != "Passed"]
+    for name, result, message in failed:
+        print(f"  {status(result)}: {name}
+         {message.splitlines()[0] if message else ''}")
     print(f"Всего тестов: {len(cases)}, из них AmmoMagazineTests: {len(mine)}; PASS: {len(cases) - len(failed)}, не PASS: {len(failed)}")
     return failed
 
