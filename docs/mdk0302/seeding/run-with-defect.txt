@@ -1,0 +1,52 @@
+> python ci/apply_mutation.py ammo-reload-restarts-timer
+Внесён дефект ammo-reload-restarts-timer в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: повторное R во время перезарядки перезапускает таймер (П3, Д6, ОП-2)
+> git diff --stat
+ Assets/Game/Scripts/GunScript/AmmoMagazine.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+> python tools/mdk0302/run_tests.py
+Проект: C:\Users\Huawei\bd-clickcheck
+Версия: cac6588 MDK03.02 PZ-2: fix failure message output in test runner
+Unity завершился с кодом 2 за 14 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-local.log
+  PASS    AmmoMagazineTests.T20_AddAmmo_FitsCompletely
+  PASS    AmmoMagazineTests.T21_AddAmmo_Partly_RemainderStaysInBox
+  PASS    AmmoMagazineTests.T22_AddAmmo_Boundary_ExactlyToLimit
+  PASS    AmmoMagazineTests.T23_AddAmmo_Boundary_OneOverLimit
+  PASS    AmmoMagazineTests.T24_AddAmmo_Boundary_LastFreeSlot
+  PASS    AmmoMagazineTests.T25_AddAmmo_FullReserve_TakesNothing
+  PASS    AmmoMagazineTests.T26_AddAmmo_StartAboveLimit_TakesNothing
+  PASS    AmmoMagazineTests.T27_AddAmmo_HugeBox_NoOverflow
+  PASS    AmmoMagazineTests.T28_AddAmmo_NonPositive_ZeroBox
+  PASS    AmmoMagazineTests.T29_AddAmmo_NonPositive_NegativeBox
+  PASS    AmmoMagazineTests.T31_Ctor_MagazineZero_Error
+  PASS    AmmoMagazineTests.T32_Ctor_NegativeReserve_Error
+  PASS    AmmoMagazineTests.T33_Ctor_NegativeMaxReserve_Error
+  PASS    AmmoMagazineTests.T34_Ctor_NegativeReloadTime_Error
+  PASS    AmmoMagazineTests.T35_Ctor_NaNReloadTime_Error
+  PASS    AmmoMagazineTests.T05_Reload_Decision_D1_PartialMagazine_WithReserve_Starts
+  PASS    AmmoMagazineTests.T06_Reload_Decision_D2_NoReserve_Rejected
+  PASS    AmmoMagazineTests.T07_Reload_Decision_D3_InfiniteReserve_Starts
+  PASS    AmmoMagazineTests.T08_Reload_Decision_D4_FullMagazine_Rejected
+  PASS    AmmoMagazineTests.T09_Reload_Decision_D5_OneMissing_OneInReserve_Starts
+  PASS    AmmoMagazineTests.T11_Reload_Transfer_ReserveCoversNeed
+  PASS    AmmoMagazineTests.T12_Reload_Transfer_PartialMagazine
+  PASS    AmmoMagazineTests.T13_Reload_Transfer_ReserveLessThanNeed
+  PASS    AmmoMagazineTests.T14_Reload_Transfer_ReserveExactlyNeed
+  PASS    AmmoMagazineTests.T01_Fire_WithAmmo_TakesOneRound
+  PASS    AmmoMagazineTests.T02_Fire_LastRound_EmptiesMagazine
+  PASS    AmmoMagazineTests.T03_Fire_EmptyMagazine_NoShotCountersUnchanged
+  PASS    AmmoMagazineTests.T04_Reload_NoAmmoAtAll_DoesNotStart
+  FAIL    AmmoMagazineTests.T10_Reload_Decision_D6_AlreadyReloading_IgnoredTimerNotRestarted
+  PASS    AmmoMagazineTests.T15_Reload_TimeBoundary_JustBeforeAndExactly
+  PASS    AmmoMagazineTests.T16_Reload_InfiniteReserve_FillsWithoutSpending
+  PASS    AmmoMagazineTests.T17_State_FireDuringReload_Blocked
+  PASS    AmmoMagazineTests.T18_State_SituationC1_FromSpecExample
+  PASS    AmmoMagazineTests.T19_State_CancelReload_NoTransferCanRestart
+  PASS    AmmoMagazineTests.T30_AddAmmo_InfiniteReserve_TakesNothing
+  PASS    AmmoMagazineTests.T36_Ctor_MinimalValidSettings_FullMagazine
+  PASS    AmmoMagazineTests.T37_OneByOne_LoadsOneRoundPerInterval
+  PASS    AmmoMagazineTests.T38_OneByOne_CancelAfterFirst_KeepsLoadedRound
+  PASS    AmmoMagazineTests.T39_OneByOne_LongFrame_CatchesUp
+  FAIL: BeerAndDragon.Tests.AmmoMagazineTests.T10_Reload_Decision_D6_AlreadyReloading_IgnoredTimerNotRestarted
+         повторное R во время перезарядки игнорируется (ОП-2)
+Всего тестов: 127, из них AmmoMagazineTests: 39; PASS: 126, не PASS: 1
+exit code 1

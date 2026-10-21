@@ -56,6 +56,17 @@
 | Регламент и DoD | [docs/repo-rules.md](docs/repo-rules.md) |
 | Проверка однозначности, оппонирование, baseline | [docs/mdk0302/ambiguity-check.md](docs/mdk0302/ambiguity-check.md), [docs/mdk0302/opposition.md](docs/mdk0302/opposition.md) |
 
+### МДК.03.02, ПЗ-2: система проверок (магазин и запас дробовика)
+| Результат | Где |
+|---|---|
+| Объект: правила магазина, перезарядки, подбора коробок | [AmmoMagazine.cs](Assets/Game/Scripts/GunScript/AmmoMagazine.cs) (выделен из `Weapon`) |
+| Правила, тест-дизайн (4 техники), данные, заглушка времени, ручные проверки | [docs/mdk0302/test-plan.md](docs/mdk0302/test-plan.md) |
+| Автотесты T01–T39 | [AmmoMagazineTests.cs](Assets/Game/Tests/Editor/AmmoMagazineTests.cs) |
+| Запуск: локально, с покрытием, засев | `python tools/mdk0302/run_tests.py [--coverage] [--seed id,...]` |
+| Покрытие (до / после дополнения набора) | [docs/mdk0302/coverage/](docs/mdk0302/coverage/) |
+| Протокол засева дефектов | [docs/mdk0302/seeding-protocol.md](docs/mdk0302/seeding-protocol.md), дефекты `ammo-*` в [ci/mutations.json](ci/mutations.json) |
+| Реестр рисков | [docs/mdk0302/risks.md](docs/mdk0302/risks.md) |
+
 ### CI (Minimal CI)
 | Уровень | Файл | Когда запускается |
 |---|---|---|
@@ -81,7 +92,7 @@ Assets/Game/
 │   ├── Diagnostics/              журнал, headless-прогон для CI                FR-DIAG
 │   ├── Core/                     системные модули: пул объектов                SP-1
 │   └── Editor/                   инструменты редактора (меню Tools → BeerAndDragon)
-├── Tests/Editor/                 EditMode-тесты (45)
+├── Tests/Editor/                 EditMode-тесты (127)
 └── Assets/                       сторонние паки и сгенерированные ассеты (Git LFS)
 tools/codemap/                    CodeMap — живая карта кода в браузере (codemap.cmd)
 ```
