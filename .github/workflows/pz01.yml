@@ -1,5 +1,5 @@
 # ПЗ-1 (МДК.01.04): базовая автоматическая проверка минимального компонента.
-# Собирает игру (Linux, без графики), запускает её и проверяет наблюдаемый результат:
+# Собирает игру (Windows), запускает её без графики на Windows-раннере и проверяет наблюдаемый результат:
 # идентификатор версии = коммит этой сборки, штатный запуск с тестовой конфигурацией,
 # ошибка и код 2 при неверной конфигурации. Скрипт проверки: ci/check_component.py.
 #
@@ -37,7 +37,7 @@ jobs:
     needs: checks
     uses: ./.github/workflows/_unity-build.yml
     with:
-      target: StandaloneLinux64
+      target: StandaloneWindows64
       versioning: None          # версия -- из ProjectSettings (bundleVersion), коммит -- из build_info.json
       retention-days: 7
     secrets: inherit
@@ -45,8 +45,11 @@ jobs:
   component:
     name: Component check
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,15 +62,15 @@ jobs:
 
       - name: Проверка компонента
         run: |
-          exe=$(find dist -maxdepth 2 -type f -name 'BeerAndDragon*' ! -name '*.so' ! -name '*.debug' | head -1)
-          chmod +x "$exe"
+          exe=$(find dist -maxdepth 2 -type f -name 'BeerAndDragon.exe' | head -1)
           echo "Проверяемый файл: $exe"
-          python3 ci/check_component.py --exe "$exe" --expect-commit "${GITHUB_SHA::7}" | tee check.txt
+          export PYTHONIOENCODING=utf-8
+          python ci/check_component.py --exe "$exe" --expect-commit "${GITHUB_SHA::7}" | tee check.txt
           code=${PIPESTATUS[0]}
           { echo '## ПЗ-1: проверка компонента'; echo '```'; cat check.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           # Результат каждой проверки -- аннотацией: виден в PR и на странице запуска без открытия журнала.
           # Для FAIL -- вместе с подробностями (хвост журнала игры), строки склеены через %0A.
-          python3 - <<'PY'
+          python - <<'PY'
           import re
           text = open("check.txt", encoding="utf-8").read()
           for block in re.split(r"\n(?=(?:PASS|FAIL) |\$ |\nИтог)", text):

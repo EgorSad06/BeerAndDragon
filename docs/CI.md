@@ -13,9 +13,9 @@ PR / рабочие ветки ─┤ структура репо · стати�
 main ───────────────► checks ─► tests ─► _unity-build.yml (Windows) ─► артефакт на 14 дней
 
 PZ checks (вручную) ─► mutation: baseline + по прогону на каждый засеянный дефект ─► mutation score
-                    └► diagnostics: Linux-сборка, запуск с -diag, журнал и отчёт
+                    └► diagnostics: Windows-сборка, запуск с -diag, журнал и отчёт
 
-тег vX.Y.Z ─────────► checks ─► tests ─► сборка Win + Linux ─► Release gate ─► GitHub Release
+тег vX.Y.Z ─────────► checks ─► tests ─► сборка Win ─► smoke (Win) ─► Release gate ─► GitHub Release
                                                                пакет · установка · smoke-замер · SBOM
 ```
 
@@ -62,7 +62,7 @@ EditMode-тесты: `Assets/Game/Tests/Editor/` (инвентарь, здоро
 ### Release Gate
 1. Быстрые проверки + поиск секретов по всей истории.
 2. EditMode-тесты.
-3. Сборка Windows (поставка) и Linux (для запуска на CI) → `zip` + `SHA256SUMS.txt`.
+3. Сборка Windows → `zip` + `SHA256SUMS.txt`; smoke-запуск — на Windows-раннере.
 4. **Установка**: проверка контрольных сумм, распаковка в чистую папку, проверка состава (`.exe`, `UnityPlayer.dll`, `_Data`), размер.
 5. **Эксплуатационное измерение**: игра запускается headless (`-batchmode -nographics -ciSmoke 10`), пишет `smoke-report.json`:
    время загрузки сцены, кадры, FPS, число ошибок. Пороги: `MAX_STARTUP_SECONDS=30`, `MAX_ERRORS=0` (в `release.yml`).
