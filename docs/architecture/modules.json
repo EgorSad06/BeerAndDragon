@@ -1,0 +1,101 @@
+{
+  "legend": "A -> B: исходный код A зависит от контракта или типов B (ссылается на них). Направление вызова может отличаться: Weapons вызывает реализацию пула, но зависит только от IObjectPool и фабрики. Проверка: python ci/check_module_map.py",
+  "modules": [
+    {
+      "id": "ObjectPool", "status": "работает", "author": "EgorSad06", "layer": "core",
+      "responsibility": "Выдача и переиспользование объектов с жёстким лимитом; правило переиспользования самого старого",
+      "contract": "IObjectPool<T>: Get / Release / Prewarm / IsActive, счётчики; ошибки — docs/modules/object-pool.md",
+      "files": ["Assets/Game/Scripts/Core/*.cs"], "location": "Assets/Game/Scripts/Core/",
+      "dependsOn": []
+    },
+    {
+      "id": "BulletHoles", "status": "работает", "author": "EgorSad06", "layer": "domain",
+      "responsibility": "Постановка дырок от пуль на поверхность и снятие по истечении времени; прогон -decalProbe",
+      "contract": "BulletHoles(IObjectPool<GameObject>, offset, lifetime, flip): Place(point, normal, spin, now), Tick(now)",
+      "files": ["Assets/Game/Scripts/GunScript/BulletHoles.cs", "Assets/Game/Scripts/GunScript/BulletHoleProbe.cs"],
+      "location": "Assets/Game/Scripts/GunScript/BulletHoles.cs",
+      "dependsOn": ["ObjectPool", "Diagnostics"]
+    },
+    {
+      "id": "Config", "status": "работает", "author": "EgorSad06", "layer": "core",
+      "responsibility": "Чтение и проверка game-config.json (targetFps, logLevel, decalPool)",
+      "contract": "GameConfig.TryParse(json) -> Values | ошибка; Load(args); Apply()",
+      "files": ["Assets/Game/Scripts/Diagnostics/GameConfig.cs"], "location": "Assets/Game/Scripts/Diagnostics/GameConfig.cs",
+      "dependsOn": ["Diagnostics", "ObjectPool"]
+    },
+    {
+      "id": "Diagnostics", "status": "работает", "author": "EgorSad06", "layer": "core",
+      "responsibility": "Журнал, версия сборки, запуск/завершение с кодом, smoke-прогон для CI",
+      "contract": "GameLog.Info/Warn/Error/Verbose, Quit(code); BuildInfo.Full; -version, -ciSmoke N",
+      "files": ["Assets/Game/Scripts/Diagnostics/GameLog.cs", "Assets/Game/Scripts/Diagnostics/DiagnosticsRunner.cs", "Assets/Game/Scripts/Diagnostics/BuildInfo.cs"],
+      "location": "Assets/Game/Scripts/Diagnostics/",
+      "dependsOn": ["Config"]
+    },
+    {
+      "id": "Weapons", "status": "работает", "author": "EgorSad06", "layer": "gameplay",
+      "responsibility": "Стрельба, меч, переключение оружия; точка сборки пула декалей",
+      "contract": "Weapon: магазин, перезарядка, AddAmmo; WeaponSwitcher.Equip(name); Damageable",
+      "files": ["Assets/Game/Scripts/GunScript/Weapon.cs", "Assets/Game/Scripts/GunScript/AmmoMagazine.cs", "Assets/Game/Scripts/GunScript/Sword.cs", "Assets/Game/Scripts/GunScript/WeaponSwitcher.cs", "Assets/Game/Scripts/GunScript/WeaponSway.cs", "Assets/Game/Scripts/GunScript/Damageable.cs", "Assets/Game/Scripts/GunScript/RandomSpin.cs"],
+      "location": "Assets/Game/Scripts/GunScript/",
+      "dependsOn": ["BulletHoles", "ObjectPool", "Config", "Diagnostics", "Items", "Movement", "Player"]
+    },
+    {
+      "id": "Movement", "status": "работает", "author": "EgorSad06", "layer": "gameplay",
+      "responsibility": "Передвижение рыцаря, камера, бег по стенам",
+      "contract": "KnightMovement, CameraPOV (Yaw, AddRecoil), WallClimb, WallRunSurface",
+      "files": ["Assets/Game/Scripts/MainKnight/*.cs"], "location": "Assets/Game/Scripts/MainKnight/",
+      "dependsOn": ["Player"]
+    },
+    {
+      "id": "Player", "status": "работает", "author": "EgorSad06", "layer": "gameplay",
+      "responsibility": "Здоровье, эффекты, блокировка ввода, анимация рыцаря, вид от 3-го лица",
+      "contract": "PlayerHealth.TakeDamage/Heal, PlayerStatusEffects, PlayerInputLock, KnightAnimator",
+      "files": ["Assets/Game/Scripts/Player/*.cs"], "location": "Assets/Game/Scripts/Player/",
+      "dependsOn": ["Diagnostics", "Items", "Movement", "Skate", "Weapons"]
+    },
+    {
+      "id": "Items", "status": "работает", "author": "EgorSad06", "layer": "gameplay",
+      "responsibility": "Инвентарь (стопки, обмен), подбор, использование предметов",
+      "contract": "Inventory.Add/Swap/Use/CompleteUse; ItemDefinition; ItemUser",
+      "files": ["Assets/Game/Scripts/Items/*.cs"], "location": "Assets/Game/Scripts/Items/",
+      "dependsOn": ["Diagnostics", "Movement", "Player", "Skate", "Weapons"]
+    },
+    {
+      "id": "Skate", "status": "работает", "author": "EgorSad06", "layer": "gameplay",
+      "responsibility": "Катание, трюки, грайнд, очки, звуки",
+      "contract": "SkaterController (состояния, события TrickAdded/ComboLanded), GrindRail, Skateboard",
+      "files": ["Assets/Game/Scripts/Skate/*.cs"], "location": "Assets/Game/Scripts/Skate/",
+      "dependsOn": ["Diagnostics", "Items", "Movement", "Player", "UI", "Weapons"]
+    },
+    {
+      "id": "UI", "status": "работает", "author": "EgorSad06", "layer": "presentation",
+      "responsibility": "HUD: здоровье, спидометр, патроны, сумка-инвентарь",
+      "contract": "GameHUD (строится из кода), InventorySlotView, UISprites",
+      "files": ["Assets/Game/Scripts/UI/*.cs"], "location": "Assets/Game/Scripts/UI/",
+      "dependsOn": ["Items", "Player", "Weapons"]
+    },
+    {
+      "id": "EditorTools", "status": "работает", "author": "EgorSad06", "layer": "tooling",
+      "responsibility": "Инструменты редактора: сборка в двух режимах, генерация ассетов, настройка сцены (в игру не входят)",
+      "contract": "BuildTool.BuildDevelopment/BuildRelease; меню Tools > BeerAndDragon",
+      "files": ["Assets/Game/Scripts/Editor/*.cs"], "location": "Assets/Game/Scripts/Editor/",
+      "dependsOn": ["Diagnostics", "Items", "Movement", "Player", "Skate", "UI", "Weapons"]
+    },
+    {
+      "id": "BatchRaycast", "status": "план", "author": "EgorSad06", "layer": "core",
+      "responsibility": "Пакетные лучи дроби через Job System (направление B, SP-2)",
+      "contract": "будет определён в ПЗ по параллелизму",
+      "files": [], "location": "—",
+      "dependsOn": []
+    }
+  ],
+  "cycles": [
+    { "between": ["Config", "Diagnostics"], "why": "GameLog при старте загружает конфигурацию (GameConfig.Load), а GameConfig пишет в журнал и берёт аргументы через GameLog. Оба — инфраструктура старта; разорвать можно выносом разбора аргументов в отдельный CommandLine." },
+    { "between": ["Movement", "Player"], "why": "Передвижение читает PlayerInputLock (лежит в Player), а KnightAnimator и ThirdPersonCamera читают состояние передвижения. Исторически блокировка ввода живёт в Player; план — вынести её в общий модуль ввода." },
+    { "between": ["Items", "Player"], "why": "Предметы применяют эффекты к PlayerHealth/PlayerStatusEffects, а KnightAnimator проигрывает позы ItemUser (курение, питьё)." },
+    { "between": ["Items", "Weapons"], "why": "Inventory выбирает оружие через WeaponSwitcher, а WeaponSwitcher проверяет наличие Inventory (FindFirstObjectByType) для выбора оружия по умолчанию." },
+    { "between": ["Items", "Skate"], "why": "ItemUser не даёт пить/курить на скейте (SkaterController), а SkaterController не даёт встать на доску при открытой сумке (Inventory)." },
+    { "between": ["Player", "Skate"], "why": "KnightAnimator ставит ноги по доске (SkaterController), а SkaterController наносит урон при падении (PlayerHealth) и учитывает ускорение (PlayerStatusEffects)." },
+    { "between": ["Player", "Weapons"], "why": "KnightAnimator анимирует руки по состоянию Sword/Weapon, а оружие проверяет PlayerInputLock." }
+  ]
+}

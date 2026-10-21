@@ -16,7 +16,7 @@ MonoBehaviour:
   description: "\u0421\u043A\u043E\u0440\u043E\u0441\u0442\u044C x1.5 \u043D\u0430
     8 \u0441\u0435\u043A\u0443\u043D\u0434. \u0421\u0442\u0430\u043A\u0430\u0435\u0442\u0441\u044F
     \u043F\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438."
-  icon: {fileID: 21300000, guid: 020bc68ec6b38724e8e3e26a181de0b9, type: 3}
+  icon: {fileID: 21300000, guid: 01e5270a997af854297a3419d4eb98c1, type: 3}
   kind: 1
   maxStack: 3
   weaponObjectName: 

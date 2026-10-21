@@ -92,6 +92,11 @@ jobs:
           githubToken: ${{ inputs.mutation == '' && secrets.GITHUB_TOKEN || '' }}
           checkName: EditMode test results
 
+      # Unity возвращает 0, даже если тестовый класс не загрузился (NotRunnable) -- проверяем XML сами
+      - name: Все тесты загружены и выполнены
+        if: steps.license.outputs.ok == 'true' && inputs.mutation == ''
+        run: python3 ci/check_test_results.py test-results/*.xml --min-total 50
+
       - name: Итог
         id: result
         if: always()

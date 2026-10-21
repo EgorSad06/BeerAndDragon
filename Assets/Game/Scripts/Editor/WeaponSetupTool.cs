@@ -54,6 +54,7 @@ public static class WeaponSetupTool
         SetupPlayerComponents(player, items, audio);
         SetupHud(items);
         BuildPickupPrefabs(items);
+        ArtUpgradeTool.Apply();   // меч из Medieval Weapons, банка Red Bull, пиксельный HUD поверх сгенерированного
 
         AssetDatabase.SaveAssets();
         EditorSceneManager.MarkSceneDirty(player.gameObject.scene);

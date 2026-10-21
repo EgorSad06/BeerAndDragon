@@ -1,0 +1,65 @@
+Внесён дефект ammo-tick-boundary в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: граница времени перезарядки исключена: ровно через 0,9 с патроны ещё не перенесены (П4)
+Внесён дефект ammo-reload-when-full в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: перезарядка начинается при полном магазине (П3, таблица решений Д4)
+Внесён дефект ammo-reload-empty-reserve в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: перезарядка начинается при пустом запасе (П2/П3, Д2)
+Внесён дефект ammo-transfer-ignores-reserve в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: перенос в магазин не ограничен запасом -- запас уходит в минус (П4)
+Внесён дефект ammo-fire-during-reload в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: во время перезарядки можно стрелять (П4, переход Перезарядка -> выстрел)
+Внесён дефект ammo-reload-restarts-timer в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: повторное R во время перезарядки перезапускает таймер (П3, Д6, ОП-2)
+Внесён дефект ammo-negative-box в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: коробка с отрицательным числом патронов уменьшает запас (FR-WPN-04.1)
+Внесён дефект ammo-default-empty-magazine в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: неверное значение по умолчанию: оружие появляется с пустым магазином (П1)
+Внесён дефект ammo-pump-catchup в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: помпа: после паузы кадра следующий патрон отсчитывается от позднего кадра, а не от момента прошлого патрона (П4, режим по одному)
+Внесён дефект ammo-no-cap в Assets/Game/Scripts/GunScript/AmmoMagazine.cs: коробки патронов игнорируют максимум запаса
+Проект: C:\Users\Huawei\bd-clickcheck
+Версия: 94ebfd7 MDK03.02 PZ-2: seeded defects for AmmoMagazine, coverage summary (before), packages lock
+
+=== Дефект ammo-tick-boundary: граница времени перезарядки исключена: ровно через 0,9 с патроны ещё не перенесены (П4)
+Unity завершился с кодом 2 за 21 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-tick-boundary.log
+  -> обнаружен: T11_Reload_Transfer_ReserveCoversNeed, T12_Reload_Transfer_PartialMagazine, T13_Reload_Transfer_ReserveLessThanNeed, T14_Reload_Transfer_ReserveExactlyNeed, T10_Reload_Decision_D6_AlreadyReloading_IgnoredTimerNotRestarted, T15_Reload_TimeBoundary_JustBeforeAndExactly, T16_Reload_InfiniteReserve_FillsWithoutSpending, T18_State_SituationC1_FromSpecExample
+
+=== Дефект ammo-reload-when-full: перезарядка начинается при полном магазине (П3, таблица решений Д4)
+Unity завершился с кодом 2 за 15 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-reload-when-full.log
+  -> обнаружен: T08_Reload_Decision_D4_FullMagazine_Rejected
+
+=== Дефект ammo-reload-empty-reserve: перезарядка начинается при пустом запасе (П2/П3, Д2)
+Unity завершился с кодом 2 за 16 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-reload-empty-reserve.log
+  -> обнаружен: T06_Reload_Decision_D2_NoReserve_Rejected, T04_Reload_NoAmmoAtAll_DoesNotStart
+
+=== Дефект ammo-transfer-ignores-reserve: перенос в магазин не ограничен запасом -- запас уходит в минус (П4)
+Unity завершился с кодом 2 за 16 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-transfer-ignores-reserve.log
+  -> обнаружен: T13_Reload_Transfer_ReserveLessThanNeed
+
+=== Дефект ammo-fire-during-reload: во время перезарядки можно стрелять (П4, переход Перезарядка -> выстрел)
+Unity завершился с кодом 2 за 15 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-fire-during-reload.log
+  -> обнаружен: T17_State_FireDuringReload_Blocked
+
+=== Дефект ammo-reload-restarts-timer: повторное R во время перезарядки перезапускает таймер (П3, Д6, ОП-2)
+Unity завершился с кодом 2 за 15 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-reload-restarts-timer.log
+  -> обнаружен: T10_Reload_Decision_D6_AlreadyReloading_IgnoredTimerNotRestarted
+
+=== Дефект ammo-negative-box: коробка с отрицательным числом патронов уменьшает запас (FR-WPN-04.1)
+Unity завершился с кодом 2 за 16 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-negative-box.log
+  -> обнаружен: T29_AddAmmo_NonPositive_NegativeBox
+
+=== Дефект ammo-default-empty-magazine: неверное значение по умолчанию: оружие появляется с пустым магазином (П1)
+Unity завершился с кодом 2 за 15 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-default-empty-magazine.log
+  -> обнаружен: T08_Reload_Decision_D4_FullMagazine_Rejected, T12_Reload_Transfer_PartialMagazine, T01_Fire_WithAmmo_TakesOneRound, T02_Fire_LastRound_EmptiesMagazine, T17_State_FireDuringReload_Blocked, T18_State_SituationC1_FromSpecExample, T36_Ctor_MinimalValidSettings_FullMagazine
+
+=== Дефект ammo-pump-catchup: помпа: после паузы кадра следующий патрон отсчитывается от позднего кадра, а не от момента прошлого патрона (П4, режим по одному)
+Unity завершился с кодом 0 за 15 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-pump-catchup.log
+  -> пропущен: --
+
+=== Дефект ammo-no-cap: коробки патронов игнорируют максимум запаса
+Unity завершился с кодом 2 за 15 с; журнал C:\Users\Huawei\bd-clickcheck\build\mdk0302\unity-seed-ammo-no-cap.log
+  -> обнаружен: T21_AddAmmo_Partly_RemainderStaysInBox, T23_AddAmmo_Boundary_OneOverLimit, T25_AddAmmo_FullReserve_TakesNothing, T26_AddAmmo_StartAboveLimit_TakesNothing, T27_AddAmmo_HugeBox_NoOverflow, AddAmmo_RespectsMaxReserve
+
+Протокол засева:
+  ammo-tick-boundary           обнаружен  T11_Reload_Transfer_ReserveCoversNeed, T12_Reload_Transfer_PartialMagazine, T13_Reload_Transfer_ReserveLessThanNeed, T14_Reload_Transfer_ReserveExactlyNeed, T10_Reload_Decision_D6_AlreadyReloading_IgnoredTimerNotRestarted, T15_Reload_TimeBoundary_JustBeforeAndExactly, T16_Reload_InfiniteReserve_FillsWithoutSpending, T18_State_SituationC1_FromSpecExample
+  ammo-reload-when-full        обнаружен  T08_Reload_Decision_D4_FullMagazine_Rejected
+  ammo-reload-empty-reserve    обнаружен  T06_Reload_Decision_D2_NoReserve_Rejected, T04_Reload_NoAmmoAtAll_DoesNotStart
+  ammo-transfer-ignores-reserve обнаружен  T13_Reload_Transfer_ReserveLessThanNeed
+  ammo-fire-during-reload      обнаружен  T17_State_FireDuringReload_Blocked
+  ammo-reload-restarts-timer   обнаружен  T10_Reload_Decision_D6_AlreadyReloading_IgnoredTimerNotRestarted
+  ammo-negative-box            обнаружен  T29_AddAmmo_NonPositive_NegativeBox
+  ammo-default-empty-magazine  обнаружен  T08_Reload_Decision_D4_FullMagazine_Rejected, T12_Reload_Transfer_PartialMagazine, T01_Fire_WithAmmo_TakesOneRound, T02_Fire_LastRound_EmptiesMagazine, T17_State_FireDuringReload_Blocked, T18_State_SituationC1_FromSpecExample, T36_Ctor_MinimalValidSettings_FullMagazine
+  ammo-pump-catchup            пропущен   --
+  ammo-no-cap                  обнаружен  T21_AddAmmo_Partly_RemainderStaysInBox, T23_AddAmmo_Boundary_OneOverLimit, T25_AddAmmo_FullReserve_TakesNothing, T26_AddAmmo_StartAboveLimit_TakesNothing, T27_AddAmmo_HugeBox_NoOverflow, AddAmmo_RespectsMaxReserve
+Засеяно 10, обнаружено 9, пропущено 1

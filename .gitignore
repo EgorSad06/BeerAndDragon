@@ -119,3 +119,15 @@ InitTestScene*.unity*
 *.blend1.meta
 **/Unreal Engine 5 Project/Saved/Logs/
 **/Unreal Engine 5 Project/Saved/Crashes/
+# Идентификатор сборки (коммит) -- генерируется перед сборкой, см. BuildTool.cs
+/[Aa]ssets/Game/BuildInfo/
+/[Aa]ssets/Game/BuildInfo.meta
+# Список LFS-объектов для ключа кэша (создаётся шагом CI)
+.lfs-assets-id
+# Сборка средства просмотра ПЗ-1
+tools/pz01/AsmInspect/bin/
+tools/pz01/AsmInspect/obj/
+!tools/pz01/AsmInspect/AsmInspect.csproj
+!tools/pz02/PoolDoc/PoolDoc.csproj
+tools/pz02/PoolDoc/bin/
+tools/pz02/PoolDoc/obj/

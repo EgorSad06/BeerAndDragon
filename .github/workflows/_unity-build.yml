@@ -15,6 +15,10 @@ on:
       retention-days:
         type: number
         default: 14
+      versioning:
+        description: "Semantic (из git-тегов vX.Y.Z) или None (версия из ProjectSettings)"
+        type: string
+        default: Semantic
     secrets:
       UNITY_LICENSE:
         required: true
@@ -60,6 +64,15 @@ jobs:
       - name: git lfs pull
         run: git lfs pull
 
+      # Идентификатор версии: короткий SHA коммита попадает в игру (BuildInfo.Full, -version).
+      # В контейнере Unity git может быть недоступен -- поэтому пишем файл здесь, на раннере.
+      - name: build_info.json (коммит сборки)
+        run: |
+          mkdir -p Assets/Game/BuildInfo/Resources
+          echo "{\"commit\":\"${GITHUB_SHA::7}\",\"dirty\":false,\"builtAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            > Assets/Game/BuildInfo/Resources/build_info.json
+          cat Assets/Game/BuildInfo/Resources/build_info.json
+
       - uses: actions/cache@v4
         with:
           path: Library
@@ -76,7 +89,7 @@ jobs:
         with:
           targetPlatform: ${{ inputs.target }}
           buildName: BeerAndDragon
-          versioning: ${{ inputs.version != '' && 'Custom' || 'Semantic' }}
+          versioning: ${{ inputs.version != '' && 'Custom' || inputs.versioning }}
           version: ${{ inputs.version }}
 
       - name: Имя артефакта

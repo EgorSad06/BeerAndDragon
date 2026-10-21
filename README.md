@@ -23,12 +23,57 @@
 | Реализация первого модуля | [Assets/Game/Scripts/Core/BoundedPool.cs](Assets/Game/Scripts/Core/BoundedPool.cs) | пул объектов без аллокаций |
 | Тесты первого модуля | [Assets/Game/Tests/Editor/BoundedPoolTests.cs](Assets/Game/Tests/Editor/BoundedPoolTests.cs) | 10 тестов, по одному на пункт контракта |
 
+### МДК.01.04, ПЗ-1: инструментальный контур и минимальный компонент
+| Результат | Где |
+|---|---|
+| ADR-001 — язык, технологии, модель исполнения | [docs/adr/ADR-001-stack.md](docs/adr/ADR-001-stack.md) |
+| Декларация инструментального контура (7 позиций) | [docs/toolchain.md](docs/toolchain.md) |
+| Инструкция: сборка и запуск из чистого окружения | [docs/RUN.md](docs/RUN.md) |
+| Минимальный компонент: конфигурация, версия, диагностика | [GameConfig.cs](Assets/Game/Scripts/Diagnostics/GameConfig.cs), [BuildInfo.cs](Assets/Game/Scripts/Diagnostics/BuildInfo.cs), [GameLog.cs](Assets/Game/Scripts/Diagnostics/GameLog.cs), конфиг [game-config.json](Assets/StreamingAssets/game-config.json) |
+| Сборка в режимах Development / Release | [BuildTool.cs](Assets/Game/Scripts/Editor/BuildTool.cs), [tools/pz01/build.ps1](tools/pz01/build.ps1) |
+| Автоматическая проверка компонента | [ci/check_component.py](ci/check_component.py), [.github/workflows/pz01.yml](.github/workflows/pz01.yml) |
+| Протокол воспроизведения | [docs/pz01/protocol.md](docs/pz01/protocol.md) |
+
+### МДК.01.04, ПЗ-2: модульная архитектура и контракт модуля
+| Результат | Где |
+|---|---|
+| Модуль и контракт (ответственность, вход, результат, ошибки, владение, побочные эффекты) | [docs/modules/object-pool.md](docs/modules/object-pool.md), код [Assets/Game/Scripts/Core/](Assets/Game/Scripts/Core/) |
+| Документация API (XML-комментарии C#) | [docs/modules/object-pool-api.md](docs/modules/object-pool-api.md), проверка `dotnet build tools/pz02/PoolDoc` |
+| Потребитель и точка сборки | [BulletHoles.cs](Assets/Game/Scripts/GunScript/BulletHoles.cs), `Weapon.SetupBulletHoles`, параметр `decalPool` |
+| Две реализации и подмена | `BoundedPool` / `LinkedPool`, тесты [ObjectPoolContractTests](Assets/Game/Tests/Editor/ObjectPoolContractTests.cs), [BulletHolesTests](Assets/Game/Tests/Editor/BulletHolesTests.cs) |
+| Модульная карта | [docs/architecture/module-map.md](docs/architecture/module-map.md), проверка `python ci/check_module_map.py` |
+| Профиль сложности, модуль-кандидат, ADR | [docs/complexity-profile.md](docs/complexity-profile.md), [ADR-002](docs/adr/ADR-002-decal-pool.md) |
+| Проверка модуля по инструкции | [docs/pz02/CHECK.md](docs/pz02/CHECK.md), протокол [docs/pz02/protocol.md](docs/pz02/protocol.md) |
+
+### МДК.03.02, ПЗ-1: требования и регламент (участок «Оружие и попадания»)
+| Результат | Где |
+|---|---|
+| Устав проекта | [docs/charter.md](docs/charter.md) |
+| Обследование: вопросы и протокол | [docs/mdk0302/survey.md](docs/mdk0302/survey.md) |
+| Спецификация 1.0, требования участка (Дано — Когда — Тогда) | [docs/requirements.md](docs/requirements.md), раздел 5.2 |
+| Место участка в сценарии и MVP | [docs/mvp.md](docs/mvp.md) |
+| Исходное состояние и ограничения безопасности | [docs/mdk0302/initial-state-security.md](docs/mdk0302/initial-state-security.md) |
+| Регламент и DoD | [docs/repo-rules.md](docs/repo-rules.md) |
+| Проверка однозначности, оппонирование, baseline | [docs/mdk0302/ambiguity-check.md](docs/mdk0302/ambiguity-check.md), [docs/mdk0302/opposition.md](docs/mdk0302/opposition.md) |
+
+### МДК.03.02, ПЗ-2: система проверок (магазин и запас дробовика)
+| Результат | Где |
+|---|---|
+| Объект: правила магазина, перезарядки, подбора коробок | [AmmoMagazine.cs](Assets/Game/Scripts/GunScript/AmmoMagazine.cs) (выделен из `Weapon`) |
+| Правила, тест-дизайн (4 техники), данные, заглушка времени, ручные проверки | [docs/mdk0302/test-plan.md](docs/mdk0302/test-plan.md) |
+| Автотесты T01–T39 | [AmmoMagazineTests.cs](Assets/Game/Tests/Editor/AmmoMagazineTests.cs) |
+| Запуск: локально, с покрытием, засев | `python tools/mdk0302/run_tests.py [--coverage] [--seed id,...]` |
+| Покрытие (до / после дополнения набора) | [docs/mdk0302/coverage/](docs/mdk0302/coverage/) |
+| Протокол засева дефектов | [docs/mdk0302/seeding-protocol.md](docs/mdk0302/seeding-protocol.md), дефекты `ammo-*` в [ci/mutations.json](ci/mutations.json) |
+| Реестр рисков | [docs/mdk0302/risks.md](docs/mdk0302/risks.md) |
+
 ### CI (Minimal CI)
 | Уровень | Файл | Когда запускается |
 |---|---|---|
 | Repository / PR checks | [.github/workflows/pr.yml](.github/workflows/pr.yml) → [_checks.yml](.github/workflows/_checks.yml) + [_unity-tests.yml](.github/workflows/_unity-tests.yml) | каждый PR и push в рабочие ветки |
 | Main pipeline (сборка + тесты + артефакт) | [.github/workflows/main.yml](.github/workflows/main.yml) → [_unity-build.yml](.github/workflows/_unity-build.yml) | push в `main` |
 | Проверки ПЗ (мутации, диагностика) | [.github/workflows/pz-checks.yml](.github/workflows/pz-checks.yml) | вручную: Actions → *PZ checks* |
+| ПЗ-1: проверка компонента (версия, конфигурация, коды завершения) | [.github/workflows/pz01.yml](.github/workflows/pz01.yml) | тег `0104-pz01-*`, PR компонента, вручную |
 | Release Gate | [.github/workflows/release.yml](.github/workflows/release.yml) | тег `vX.Y.Z` |
 | Скрипты проверок (Python, без Unity) | [ci/](ci/) — `check_repo.py`, `lint_cs.py`, `apply_mutation.py`, `mutations.json`, `sbom.py` | локально и в CI |
 | Описание CI и соответствие требованиям | [docs/CI.md](docs/CI.md) | |
@@ -47,7 +92,7 @@ Assets/Game/
 │   ├── Diagnostics/              журнал, headless-прогон для CI                FR-DIAG
 │   ├── Core/                     системные модули: пул объектов                SP-1
 │   └── Editor/                   инструменты редактора (меню Tools → BeerAndDragon)
-├── Tests/Editor/                 EditMode-тесты (37)
+├── Tests/Editor/                 EditMode-тесты (127)
 └── Assets/                       сторонние паки и сгенерированные ассеты (Git LFS)
 tools/codemap/                    CodeMap — живая карта кода в браузере (codemap.cmd)
 ```

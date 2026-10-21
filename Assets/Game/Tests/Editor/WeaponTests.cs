@@ -79,4 +79,22 @@ public class WeaponTests
         Assert.AreEqual(0, w.AddAmmo(10));
         Object.DestroyImmediate(go);
     }
+
+    // FR-WPN-03.1: щелчок пустого оружия есть, даже если звук не назначен в инспекторе
+    [Test]
+    public void EmptyClick_IsShortAudibleAndNotClipped()
+    {
+        AudioClip clip = Weapon.CreateEmptyClick(44100);
+        Assert.AreEqual(1, clip.channels);
+        Assert.AreEqual(0.05f, clip.length, 0.001f, "щелчок -- 50 мс");
+
+        float[] data = new float[clip.samples];
+        clip.GetData(data, 0);
+        float peak = 0f;
+        foreach (float s in data) peak = Mathf.Max(peak, Mathf.Abs(s));
+        Assert.Greater(peak, 0.1f, "щелчок должен быть слышен");
+        Assert.LessOrEqual(peak, 1f);
+        Assert.Less(Mathf.Abs(data[data.Length - 1]), 0.05f, "к концу звук затухает");
+        Object.DestroyImmediate(clip);
+    }
 }

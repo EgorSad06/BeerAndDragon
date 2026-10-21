@@ -3,7 +3,7 @@
 #
 #  mutation     -- засеянные дефекты из ci/mutations.json: каждый вносится в код, тесты
 #                  должны УПАСТЬ ("мутант убит"). Выживший мутант = дыра в тестах.
-#  diagnostics  -- сборка под Linux и запуск в диагностическом режиме (-diag) с отчётом:
+#  diagnostics  -- сборка под Windows и запуск в диагностическом режиме (-diag) с отчётом:
 #                  журнал игры, время старта, FPS, число ошибок.
 name: PZ checks
 
@@ -89,14 +89,17 @@ jobs:
     if: inputs.check == 'diagnostics'
     uses: ./.github/workflows/_unity-build.yml
     with:
-      target: StandaloneLinux64
+      target: StandaloneWindows64
       retention-days: 3
     secrets: inherit
 
   diag-run:
     needs: diag-build
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -104,8 +107,7 @@ jobs:
           path: game
       - name: Запуск игры в диагностическом режиме
         run: |
-          exe=$(find game -maxdepth 1 -type f -name 'BeerAndDragon*' ! -name '*.so' ! -name '*.debug' | head -1)
-          chmod +x "$exe"
+          exe=$(find game -maxdepth 1 -type f -name 'BeerAndDragon.exe' | head -1)
           set +e
           timeout 300 "$exe" -batchmode -nographics -diag -ciSmoke "${{ inputs.seconds }}" \
             -diagReport "$PWD/diag-report.json" -logFile "$PWD/player.log"

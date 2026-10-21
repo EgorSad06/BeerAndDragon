@@ -5,9 +5,9 @@
 # Gate:
 #  1. Быстрые проверки + поиск секретов по всей истории (защитная мера №1).
 #  2. Обязательные тесты (EditMode).
-#  3. Пакет: сборка Windows (поставка) + Linux (для smoke-запуска на CI) -> zip + SHA-256.
+#  3. Пакет: сборка Windows -> zip + SHA-256.
 #  4. "Установка": распаковка в чистую папку, проверка состава и контрольных сумм (защитная мера №2).
-#  5. Эксплуатационное измерение: smoke-запуск игры, время загрузки сцены, FPS, ошибки -- с порогами.
+#  5. Эксплуатационное измерение: smoke-запуск Windows-сборки на Windows-раннере, время загрузки сцены, FPS, ошибки -- с порогами.
 #  6. Анализ состава поставки: SBOM (CycloneDX) + список лицензий сторонних ассетов.
 name: Release Gate
 
@@ -61,18 +61,57 @@ jobs:
       retention-days: 30
     secrets: inherit
 
-  build-linux:
-    needs: [version, unity-tests]
-    uses: ./.github/workflows/_unity-build.yml
-    with:
-      target: StandaloneLinux64
-      version: ${{ needs.version.outputs.value }}
-      retention-days: 7
-    secrets: inherit
+  smoke:
+    name: Smoke (Windows)
+    needs: [version, build-windows]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-windows.outputs.artifact }}
+          path: dist/win
+      - name: "Эксплуатационное измерение: smoke-запуск"
+        run: |
+          exe=$(find dist/win -maxdepth 1 -type f -name 'BeerAndDragon.exe' | head -1)
+          set +e
+          timeout 300 "$exe" -batchmode -nographics -ciSmoke 10 -diagReport "$PWD/smoke-report.json" -logFile "$PWD/smoke-player.log"
+          code=$?
+          set -e
+          echo "exit code: $code"
+          [ -f smoke-report.json ] || { echo "::error::Игра не дошла до отчёта (крэш/зависание, код $code)"; tail -50 smoke-player.log; exit 1; }
+          cat smoke-report.json
+          python - <<'PY'
+          import json, os, sys
+          r = json.load(open("smoke-report.json"))
+          max_t, max_e = float(os.environ["MAX_STARTUP_SECONDS"]), int(os.environ["MAX_ERRORS"])
+          ok_t, ok_e = r["firstSceneLoadedSeconds"] <= max_t, r["errors"] <= max_e
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as s:
+              s.write("## Smoke-запуск\n| Метрика | Значение | Порог |\n|---|---|---|\n")
+              s.write(f"| Загрузка сцены | {r['firstSceneLoadedSeconds']} с | ≤ {max_t} с {'✅' if ok_t else '❌'} |\n")
+              s.write(f"| Ошибок в журнале | {r['errors']} | ≤ {max_e} {'✅' if ok_e else '❌'} |\n")
+              s.write(f"| Кадров / средний FPS (без GPU) | {r['framesRendered']} / {r['avgFps']} | -- |\n")
+          if not (ok_t and ok_e):
+              print("::error::Smoke-запуск не прошёл пороги"); sys.exit(1)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ needs.version.outputs.value }}
+          path: |
+            smoke-report.json
+            smoke-player.log
+          retention-days: 30
 
   gate:
     name: Release gate
-    needs: [version, build-windows, build-linux]
+    needs: [version, build-windows, smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -88,14 +127,13 @@ jobs:
           path: dist/win
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.build-linux.outputs.artifact }}
-          path: dist/linux
+          name: smoke-${{ needs.version.outputs.value }}
+          path: .
 
       - name: "Пакет: zip + SHA-256"
         run: |
           mkdir -p release
           (cd dist/win && zip -qr "../../release/BeerAndDragon-$VERSION-win64.zip" .)
-          (cd dist/linux && zip -qr "../../release/BeerAndDragon-$VERSION-linux64.zip" .)
           (cd release && sha256sum *.zip > SHA256SUMS.txt)
           cat release/SHA256SUMS.txt
           ls -lh release
@@ -104,42 +142,15 @@ jobs:
         run: |
           set -e
           (cd release && sha256sum -c SHA256SUMS.txt)          # целостность пакетов
-          rm -rf /tmp/install && mkdir -p /tmp/install/win /tmp/install/linux
+          rm -rf /tmp/install && mkdir -p /tmp/install/win
           unzip -q "release/BeerAndDragon-$VERSION-win64.zip" -d /tmp/install/win
-          unzip -q "release/BeerAndDragon-$VERSION-linux64.zip" -d /tmp/install/linux
           for f in BeerAndDragon.exe UnityPlayer.dll BeerAndDragon_Data; do
             [ -e "/tmp/install/win/$f" ] || { echo "::error::В Windows-пакете нет $f"; exit 1; }
           done
-          [ -d /tmp/install/linux/BeerAndDragon_Data ] || { echo "::error::В Linux-пакете нет BeerAndDragon_Data"; exit 1; }
           size=$(du -sm /tmp/install/win | cut -f1)
           echo "Размер установленной Windows-версии: ${size} МБ" | tee -a "$GITHUB_STEP_SUMMARY"
           # В релизе не должно быть отладочных символов и dev-сборки
           if find /tmp/install/win -iname '*.pdb' | grep -q .; then echo "::warning::В поставке есть .pdb-файлы"; fi
-
-      - name: "Эксплуатационное измерение: smoke-запуск"
-        run: |
-          exe=$(find /tmp/install/linux -maxdepth 1 -type f -name 'BeerAndDragon*' ! -name '*.so' ! -name '*.debug' | head -1)
-          chmod +x "$exe"
-          set +e
-          timeout 300 "$exe" -batchmode -nographics -ciSmoke 10 -diagReport "$PWD/smoke-report.json" -logFile "$PWD/smoke-player.log"
-          code=$?
-          set -e
-          echo "exit code: $code"
-          [ -f smoke-report.json ] || { echo "::error::Игра не дошла до отчёта (крэш/зависание, код $code)"; tail -50 smoke-player.log; exit 1; }
-          cat smoke-report.json
-          python3 - <<'PY'
-          import json, os, sys
-          r = json.load(open("smoke-report.json"))
-          max_t, max_e = float(os.environ["MAX_STARTUP_SECONDS"]), int(os.environ["MAX_ERRORS"])
-          ok_t, ok_e = r["firstSceneLoadedSeconds"] <= max_t, r["errors"] <= max_e
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as s:
-              s.write("## Smoke-запуск\n| Метрика | Значение | Порог |\n|---|---|---|\n")
-              s.write(f"| Загрузка сцены | {r['firstSceneLoadedSeconds']} с | ≤ {max_t} с {'✅' if ok_t else '❌'} |\n")
-              s.write(f"| Ошибок в журнале | {r['errors']} | ≤ {max_e} {'✅' if ok_e else '❌'} |\n")
-              s.write(f"| Кадров / средний FPS (без GPU) | {r['framesRendered']} / {r['avgFps']} | -- |\n")
-          if not (ok_t and ok_e):
-              print("::error::Smoke-запуск не прошёл пороги"); sys.exit(1)
-          PY
 
       - uses: actions/setup-python@v5
         with:

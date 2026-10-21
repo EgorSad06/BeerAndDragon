@@ -92,11 +92,14 @@ public class Weapon : MonoBehaviour
     public bool reloadOneByOne = false;     // заряжать по одному патрону (помпа); выстрел прерывает
     public bool autoReloadWhenEmpty = true;
     public KeyCode reloadKey = KeyCode.R;
-    private int currentAmmo;
-    private bool isReloading;
     private bool isCycling;
     private bool manualChambered = true;
-    private Coroutine reloadRoutine;
+
+    // Правила магазина и запаса -- в AmmoMagazine (чистый C#, тестируется без сцены). Поля выше -- только настройки;
+    // магазин создаётся из них при первом обращении (в EditMode-тестах Awake не вызывается).
+    private AmmoMagazine ammo;
+    private AmmoMagazine Ammo => ammo ??= new AmmoMagazine(magazineSize, reserveAmmo, maxReserveAmmo, reloadTime,
+                                                           infiniteReserve, reloadOneByOne);
 
     [Header("Aim / Muzzle")]
     public Transform aimOrigin;             // камера; если пусто -- найдётся сама
@@ -118,7 +121,7 @@ public class Weapon : MonoBehaviour
     public AudioSource audioSource;
     public AudioClip fireSound;
     public AudioClip reloadSound;
-    public AudioClip emptySound;
+    public AudioClip emptySound;            // не назначен -- щелчок генерируется в коде (FR-WPN-03.1)
 
     [Header("Bullet holes (decals)")]
     public GameObject bulletHolePrefab;
@@ -127,7 +130,10 @@ public class Weapon : MonoBehaviour
     public float decalLifetime = 20f;       // 0 = никогда не удалять по времени
     public int maxDecals = 60;
     public LayerMask decalIgnoreLayers;
-    private static readonly Queue<GameObject> spawnedDecals = new Queue<GameObject>();
+    private BulletHoles bulletHoles;          // потребитель пула; реализацию пула выбирает SetupBulletHoles
+
+    /// <summary>Дырки от пуль этого оружия (null, если префаб не назначен). Для диагностики.</summary>
+    public BulletHoles BulletHoles => bulletHoles;
 
     [Header("Animation hooks (если есть Animator)")]
     public Animator animator;
@@ -136,12 +142,12 @@ public class Weapon : MonoBehaviour
     public string cycleTrigger = "Cycle";
     public string emptyTrigger = "Empty";
 
-    public int CurrentAmmo => currentAmmo;
-    public int ReserveAmmo => reserveAmmo;
+    public int CurrentAmmo => Ammo.Magazine;
+    public int ReserveAmmo => Ammo.Reserve;
     public int MagazineSize => magazineSize;
     public int MaxReserveAmmo => maxReserveAmmo;
     public bool InfiniteReserve => infiniteReserve;
-    public bool IsReloading => isReloading;
+    public bool IsReloading => Ammo.IsReloading;
 
     private float FireCooldown => 60f / Mathf.Max(1f, roundsPerMinute);
 
@@ -149,7 +155,14 @@ public class Weapon : MonoBehaviour
 
     void Awake()
     {
-        currentAmmo = magazineSize;
+        // FR-WPN-04.1: неверные настройки магазина -- ошибка в журнал, оружие выключено, игра продолжается
+        try { ammo = new AmmoMagazine(magazineSize, reserveAmmo, maxReserveAmmo, reloadTime, infiniteReserve, reloadOneByOne); }
+        catch (System.ArgumentOutOfRangeException e)
+        {
+            GameLog.Error("Weapon", $"{name}: {e.Message}");
+            enabled = false;
+            return;
+        }
 
         if (owner == null) owner = transform.root;
         if (aimOrigin == null)
@@ -166,15 +179,45 @@ public class Weapon : MonoBehaviour
             kickRestPos = recoilTransform.localPosition;
             kickRestRot = recoilTransform.localRotation;
         }
+        GameLog.Verbose("Weapon", $"{name}: Awake, пул декалей...");
+        SetupBulletHoles();
+    }
+
+    void Start()
+    {
+        // -decalProbe N: воспроизводимый прогон пула декалей (модуль-кандидат ПЗ-2)
+        if (bulletHoles != null) BulletHoleProbe.RunIfRequested(bulletHoles, System.Environment.GetCommandLineArgs());
+    }
+
+    // Точка сборки: реализация пула декалей -- из конфигурации (decalPool), потребитель BulletHoles получает
+    // только IObjectPool<GameObject>. Декали создаются заранее (Prewarm), чтобы в бою не было Instantiate.
+    private void SetupBulletHoles()
+    {
+        if (bulletHolePrefab == null || maxDecals <= 0) return;
+
+        Transform root = new GameObject("[BulletHoles] " + name).transform;
+        IObjectPool<GameObject> pool = ObjectPoolFactory.Create(GameConfig.DecalPoolKind,
+            () =>
+            {
+                GameObject go = Instantiate(bulletHolePrefab, root);
+                go.SetActive(false);
+                return go;
+            },
+            maxDecals, PoolOverflow.ReuseOldest,
+            onGet: go => go.SetActive(true),
+            onRelease: go => go.SetActive(false));
+        GameLog.Verbose("Weapon", $"{name}: заготовка {maxDecals} декалей");
+        pool.Prewarm(maxDecals);
+        bulletHoles = new BulletHoles(pool, decalOffset, decalLifetime, flipDecalNormal);
+        GameLog.Verbose("Weapon", $"{name}: пул декалей {pool.GetType().Name}, лимит {maxDecals}");
     }
 
     // Переключение оружия выключает объект -- прерываем перезарядку/передёргивание,
-    // иначе корутина умрёт на середине и isReloading залипнет в true.
+    // иначе перезарядка продолжилась бы в выключенном оружии.
     void OnDisable()
     {
         StopAllCoroutines();
-        reloadRoutine = null;
-        isReloading = false;
+        Ammo.CancelReload();
         if (isCycling) { isCycling = false; manualChambered = true; }
         kickCurrent = kickTarget = Vector3.zero;
         tiltCurrent = Quaternion.identity;
@@ -187,7 +230,9 @@ public class Weapon : MonoBehaviour
 
     void Update()
     {
+        TickReload();
         HandleInput();
+        bulletHoles?.Tick(Time.time);
         currentSpreadBloom = Mathf.Max(0f, currentSpreadBloom - spreadRecoverySpeed * Time.deltaTime);
         UpdateViewKick();
     }
@@ -201,10 +246,10 @@ public class Weapon : MonoBehaviour
             : Input.GetKeyDown(fireKey);
 
         // Помпу можно прервать выстрелом, если хоть один патрон уже зарядили
-        if (isReloading && reloadOneByOne && wantsToFire && currentAmmo > 0)
-            CancelReload();
+        if (Ammo.IsReloading && reloadOneByOne && wantsToFire && Ammo.Magazine > 0)
+            Ammo.CancelReload();
 
-        if (isReloading) return;
+        if (Ammo.IsReloading) return;
 
         if (Input.GetKeyDown(reloadKey))
             TryStartReload();
@@ -218,28 +263,32 @@ public class Weapon : MonoBehaviour
 
     private void TryFire()
     {
-        if (isReloading || isCycling || Time.time < nextFireTime) return;
+        if (isCycling || Time.time < nextFireTime) return;
 
-        if (currentAmmo <= 0)
+        if (fireMode == FireMode.Manual && !manualChambered && Ammo.Magazine > 0 && !Ammo.IsReloading)
         {
             PlayEmptyFeedback();
-            if (autoReloadWhenEmpty) TryStartReload();
             return;
         }
 
-        if (fireMode == FireMode.Manual && !manualChambered)
+        switch (Ammo.TryFire())
         {
-            PlayEmptyFeedback();
-            return;
+            case FireResult.Blocked:
+                return;
+            case FireResult.Empty:
+                nextFireTime = Time.time + EmptyClickInterval; // в автоматическом режиме не щёлкать каждый кадр
+                PlayEmptyFeedback();
+                if (autoReloadWhenEmpty) TryStartReload();
+                return;
         }
 
         Fire();
     }
 
+    // Патрон уже списан в Ammo.TryFire
     private void Fire()
     {
         nextFireTime = Time.time + FireCooldown;
-        currentAmmo--;
 
         if (fireMode == FireMode.Manual)
         {
@@ -262,7 +311,7 @@ public class Weapon : MonoBehaviour
         ApplyRecoil(forward);
         PlayFireFeedback();
 
-        if (currentAmmo <= 0 && autoReloadWhenEmpty)
+        if (Ammo.Magazine <= 0 && autoReloadWhenEmpty)
             TryStartReload();
     }
 
@@ -288,6 +337,30 @@ public class Weapon : MonoBehaviour
     }
 
     // Множитель урона от дистанции: до start -- 1, после end -- minMultiplier, между -- линейно
+    public const float EmptyClickInterval = 0.2f;
+
+    private static AudioClip defaultEmptyClick;
+    private static AudioClip DefaultEmptyClick => defaultEmptyClick != null ? defaultEmptyClick : (defaultEmptyClick = CreateEmptyClick());
+
+    // Щелчок пустого оружия: 50 мс -- удар бойка (короткий шум) + металлический призвук 2,2 кГц,
+    // оба быстро затухают. Шум с фиксированным seed, чтобы звук был одинаковым при каждом запуске.
+    public static AudioClip CreateEmptyClick(int sampleRate = 44100)
+    {
+        int length = Mathf.Max(1, sampleRate / 20);
+        float[] data = new float[length];
+        System.Random rng = new System.Random(7);
+        for (int i = 0; i < length; i++)
+        {
+            float t = (float)i / sampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-t * 900f);
+            float ring = Mathf.Sin(2f * Mathf.PI * 2200f * t) * Mathf.Exp(-t * 120f);
+            data[i] = Mathf.Clamp(0.6f * noise + 0.35f * ring, -1f, 1f);
+        }
+        AudioClip clip = AudioClip.Create("EmptyClick", length, 1, sampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
     public static float FalloffMultiplier(float distance, float start, float end, float minMultiplier)
     {
         if (end <= start) return 1f;
@@ -373,21 +446,7 @@ public class Weapon : MonoBehaviour
         if (((1 << hit.collider.gameObject.layer) & decalIgnoreLayers) != 0) return;
         if (hit.rigidbody != null) return; // на летающих ящиках дырки выглядят странно
 
-        Vector3 normal = flipDecalNormal ? -hit.normal : hit.normal;
-        Quaternion rot = Quaternion.LookRotation(normal) * Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
-        Vector3 pos = hit.point + hit.normal * decalOffset;
-
-        GameObject decal = Instantiate(bulletHolePrefab, pos, rot, hit.collider.transform);
-
-        spawnedDecals.Enqueue(decal);
-        while (spawnedDecals.Count > maxDecals)
-        {
-            GameObject oldest = spawnedDecals.Dequeue();
-            if (oldest != null) Destroy(oldest);
-        }
-
-        if (decalLifetime > 0f)
-            Destroy(decal, decalLifetime);
+        bulletHoles?.Place(hit.point, hit.normal, Random.Range(0f, 360f), Time.time);
     }
 
     private void ApplyRecoil(Vector3 aimDir)
@@ -406,7 +465,7 @@ public class Weapon : MonoBehaviour
         kickCurrent = Vector3.Lerp(kickCurrent, kickTarget, Time.deltaTime * viewKickSnappiness);
         kickTarget = Vector3.Lerp(kickTarget, Vector3.zero, Time.deltaTime * viewKickReturnSpeed);
 
-        Quaternion tiltTarget = isReloading ? Quaternion.Euler(reloadTiltEuler) : Quaternion.identity;
+        Quaternion tiltTarget = Ammo.IsReloading ? Quaternion.Euler(reloadTiltEuler) : Quaternion.identity;
         tiltCurrent = Quaternion.Slerp(tiltCurrent, tiltTarget, Time.deltaTime * reloadTiltSpeed);
 
         if (recoilTransform == null) return;
@@ -416,52 +475,24 @@ public class Weapon : MonoBehaviour
 
     private void TryStartReload()
     {
-        if (isReloading || currentAmmo >= magazineSize) return;
-        if (!infiniteReserve && reserveAmmo <= 0) return;
-        reloadRoutine = StartCoroutine(ReloadRoutine());
-    }
-
-    private void CancelReload()
-    {
-        if (reloadRoutine != null) StopCoroutine(reloadRoutine);
-        reloadRoutine = null;
-        isReloading = false;
-    }
-
-    private IEnumerator ReloadRoutine()
-    {
-        isReloading = true;
+        if (!Ammo.TryStartReload(Time.time)) return;
         if (animator != null)
             animator.SetTrigger(reloadTrigger);
+        PlayReloadSound();
+    }
 
-        if (reloadOneByOne)
-        {
-            while (currentAmmo < magazineSize && (infiniteReserve || reserveAmmo > 0))
-            {
-                if (audioSource != null && reloadSound != null)
-                    audioSource.PlayOneShot(reloadSound);
-                yield return new WaitForSeconds(reloadTime);
-                currentAmmo++;
-                if (!infiniteReserve) reserveAmmo--;
-            }
-        }
-        else
-        {
-            if (audioSource != null && reloadSound != null)
-                audioSource.PlayOneShot(reloadSound);
-            yield return new WaitForSeconds(reloadTime);
+    private void TickReload()
+    {
+        int loaded = Ammo.Tick(Time.time);
+        if (loaded <= 0) return;
+        if (Ammo.IsReloading) PlayReloadSound();          // помпа: звук на каждый следующий патрон
+        else if (fireMode == FireMode.Manual) manualChambered = true;
+    }
 
-            int needed = magazineSize - currentAmmo;
-            int toLoad = infiniteReserve ? needed : Mathf.Min(needed, reserveAmmo);
-            currentAmmo += toLoad;
-            if (!infiniteReserve) reserveAmmo -= toLoad;
-        }
-
-        if (fireMode == FireMode.Manual)
-            manualChambered = true;
-
-        isReloading = false;
-        reloadRoutine = null;
+    private void PlayReloadSound()
+    {
+        if (audioSource != null && reloadSound != null)
+            audioSource.PlayOneShot(reloadSound);
     }
 
     private IEnumerator CycleRoutine()
@@ -475,13 +506,7 @@ public class Weapon : MonoBehaviour
     }
 
     // Возвращает, сколько патронов реально взяли (упёрлись в maxReserveAmmo -- меньше)
-    public int AddAmmo(int amount)
-    {
-        if (infiniteReserve || amount <= 0) return 0;
-        int take = Mathf.Min(amount, Mathf.Max(0, maxReserveAmmo - reserveAmmo));
-        reserveAmmo += take;
-        return take;
-    }
+    public int AddAmmo(int amount) => Ammo.AddAmmo(amount);
 
     private void PlayFireFeedback()
     {
@@ -502,7 +527,9 @@ public class Weapon : MonoBehaviour
     {
         if (animator != null)
             animator.SetTrigger(emptyTrigger);
-        if (audioSource != null && emptySound != null)
-            audioSource.PlayOneShot(emptySound);
+        if (audioSource == null) return;
+        // Щелчок создаётся при первом использовании, а не в Awake: в batchmode (CI, без аудиоустройства) он не нужен
+        if (emptySound == null && !Application.isBatchMode) emptySound = DefaultEmptyClick;
+        if (emptySound != null) audioSource.PlayOneShot(emptySound);
     }
 }

@@ -59,7 +59,7 @@ python ci/apply_mutation.py --check-all
 ## 5. Как проверить
 | Что | Как | Ожидаемый результат |
 |---|---|---|
-| Автотесты | Unity → *Window → General → Test Runner → EditMode → Run All* | 37 тестов зелёные |
+| Автотесты | Unity → *Window → General → Test Runner → EditMode → Run All* | 45 тестов зелёные |
 | Ручные FR | Play в `SampleScene`, критерии из [requirements.md](requirements.md) | соответствие критериям |
 | Сборка | *File → Build Profiles → Windows → Build* | `BeerAndDragon.exe` запускается |
 | CI | push в рабочую ветку / PR в `main` | зелёные `checks` и `unity-tests` |

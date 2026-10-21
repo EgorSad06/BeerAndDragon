@@ -44,15 +44,55 @@ public static class GameLog
             CloseFile();
         };
 
-        Info("App", $"Старт {Application.productName} {Application.version} | Unity {Application.unityVersion} | " +
+        // Обычные сообщения -- без стека вызовов: журнал читается человеком и скриптом CI
+        Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
+
+        // -version: только идентификатор версии и выход с кодом 0
+        if (HasArg(args, "-version"))
+        {
+            Debug.Log(BuildInfo.Full);
+            Quit(0, "вывод версии");
+            return;
+        }
+
+        Info("App", $"Старт {BuildInfo.Full} | Unity {Application.unityVersion} | " +
                     $"{Application.platform} | {SystemInfo.operatingSystem}");
         Info("App", $"CPU {SystemInfo.processorType} x{SystemInfo.processorCount}, RAM {SystemInfo.systemMemorySize} МБ, " +
                     $"GPU {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType})");
         Info("App", "Аргументы: " + string.Join(" ", args));
         if (LogFilePath != null) Info("App", "Журнал: " + LogFilePath);
         if (VerboseEnabled) Info("App", "Диагностический режим включён (-diag)");
+#if DEVELOPMENT_BUILD
+        Info("Build", "Development-сборка: Debug.Assert включены (UNITY_ASSERTIONS), доступен отладчик и Profiler");
+#endif
+
+        if (!GameConfig.Load(args, out string configError))
+        {
+            Error("Config", "Ошибка конфигурации: " + configError);
+            Quit(GameConfig.ExitCodeConfigError, "неверная конфигурация");
+            return;
+        }
+        GameConfig.Apply();
+        Info("Config", $"Конфигурация {GameConfig.SourcePath}: {GameConfig.Describe(GameConfig.Current)}");
+
+        // -assertProbe: наблюдаемое различие режимов -- в Development сработает assert, в Release вызов вырезан
+        if (HasArg(args, "-assertProbe"))
+        {
+            Debug.Assert(false, "[ASSERT][Build] Debug.Assert сработал: сборка с UNITY_ASSERTIONS");
+            Info("Build", "assert-probe: строка после Debug.Assert выполнена");
+        }
 
         DiagnosticsRunner.Create(args);
+    }
+
+    public static int ExitCode { get; private set; }
+
+    // Завершение с кодом и записью о результате (видна в журнале и в выводе -logFile)
+    public static void Quit(int code, string reason)
+    {
+        ExitCode = code;
+        Info("App", $"Завершение: код {code} ({reason})");
+        Application.Quit(code);
     }
 
     public static void Info(string area, string message) => Debug.Log(Format("INFO", area, message));
