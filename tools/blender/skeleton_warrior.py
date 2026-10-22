@@ -10,9 +10,9 @@
 
 Стиль PS1: мало полигонов, жёсткий скиннинг (каждая деталь целиком на одной кости), сглаживание по вершинам
 (гуро-шейдинг), текстуры 64x64 с грязью, зерном и 15-битным цветом с дизерингом, point-фильтр.
-Детали: голова -- одна сфера, «вылепленная» смещением вершин (глазницы, нос, скулы, челюсть), низ лица на кости
-Jaw, лицо нарисовано на текстуре SW_Skull; в глазницах синие светящиеся миндалины с ореолом, не выше поверхности
-лица; кожаная броня -- накидка на плечи с круглыми наплечниками до ворота, подтяжки (спереди по рёбрам, сзади
+Детали: голова -- один кусок, вылепленный по горизонтальным сечениям (SKULL_PROFILE: свод, виски, скулы, верхняя
+и нижняя челюсть); глазницы и носовая полость -- дыры, за ними тёмная полость черепа; синие светящиеся миндалины с
+ореолом в глубине глазниц; низ лица на кости Jaw; зубы -- на текстуре SW_Skull; кожаная броня -- накидка на плечи с круглыми наплечниками до ворота, подтяжки (спереди по рёбрам, сзади
 крест), пояс с полами, наручи, обмотки; сандалии по форме стопы; меч. Координаты -- метры, Z вверх, лицо к -Y (как принято в Blender).
 """
 import math
@@ -148,27 +148,16 @@ def tex_cloth():
 
 
 def tex_skull():
-    """Лицо черепа на планарной проекции спереди (u -- ширина головы, v -- высота): глазницы, нос, зубы, тени."""
+    """Зубы на передней части челюстей: u = 0.5 + x / 0.22, v = (z - 1.57) / 0.1 (см. head()).
+    Ряды зубов с промежутками и тёмной линией смыкания, вокруг -- кость."""
     base = tex_bone()
     yy, xx = np.mgrid[0:N, 0:N]
     u, v = (xx + 0.5) / N, 1 - (yy + 0.5) / N
-
-    def ellipse(cu, cv, ru, rv):
-        return ((u - cu) / ru) ** 2 + ((v - cv) / rv) ** 2
-
-    for cu in (0.3, 0.7):                                       # глазницы: тёмная середина, бурый край
-        e = ellipse(cu, 0.6, 0.15, 0.12)
-        base[e < 1.6] *= 0.55
-        base[e < 1.0] = np.array([0.06, 0.05, 0.04])
-        e2 = ellipse(cu, 0.45, 0.16, 0.06)                      # тень под скулой
-        base[e2 < 1.0] *= 0.7
-    nose = (np.abs(u - 0.5) < 0.06 * (v - 0.36) / 0.12) & (v > 0.36) & (v < 0.48)
-    base[nose] = np.array([0.07, 0.06, 0.05])                   # носовая полость (треугольник)
-    teeth = (v > 0.19) & (v < 0.33) & (np.abs(u - 0.5) < 0.17)
-    base[teeth] = np.array([0.78, 0.72, 0.55]) * (0.85 + 0.2 * noise(N, 1.0)[teeth])[:, None]
-    gaps = teeth & (((u - 0.5) / 0.042 % 1) < 0.22)
-    base[gaps] *= 0.3                                           # промежутки между зубами
-    base[(np.abs(v - 0.26) < 0.012) & (np.abs(u - 0.5) < 0.18)] = np.array([0.08, 0.06, 0.05])  # смыкание рядов
+    teeth = (v > 0.36) & (v < 0.78) & (np.abs(u - 0.5) < 0.22)
+    base[teeth] = np.array([0.76, 0.7, 0.52]) * (0.85 + 0.2 * noise(N, 1.0)[teeth])[:, None]
+    base[teeth & (((u - 0.5) / 0.062 % 1) < 0.26)] *= 0.35     # промежутки между зубами (1 пиксель)
+    base[teeth & (np.abs(v - 0.62) < 0.025)] = np.array([0.06, 0.05, 0.04])  # смыкание рядов
+    base[teeth & ((v < 0.4) | (v > 0.74))] *= 0.75             # дёсны темнее
     return base
 
 
@@ -235,8 +224,9 @@ MATS = [
     material("SW_EyeFire", emission=(0.1, 0.5, 1.0), strength=10.0),
     flame_material("SW_EyeGlow", save_texture("SW_EyeGlow", glow_rgb, alpha=glow_alpha, raw=True), strength=5.0),
     material("SW_Skull", save_texture("SW_Skull", tex_skull(), grime=0.22)),
+    material("SW_Cavity", emission=(0.02, 0.015, 0.02), strength=0.0),
 ]
-BONE, LEATHER, STRAP, METAL, CLOTH, STEEL, EYE, FLAME, SKULL = range(len(MATS))
+BONE, LEATHER, STRAP, METAL, CLOTH, STEEL, EYE, FLAME, SKULL, CAVITY = range(len(MATS))
 FLAT = {METAL, STEEL, FLAME}   # без сглаживания: металл с гранями, плоский ореол глаз
 
 # ---------------------------------------------------------------- кости рига (голова, хвост) -- T-поза
@@ -384,79 +374,129 @@ def glow_quad(center, w, h, bone):
     finish(quad, FLAME, bone, keep_uv=True)
 
 
-HEAD_C = Vector((0, -0.005, 1.708))      # центр головы
-HEAD_R = Vector((0.102, 0.122, 0.122))   # полуоси до лепки
-SOCKETS = [Vector((s * 0.42, -0.86, 0.14)) for s in (L, R)]
+# Череп лепится по горизонтальным сечениям снизу вверх: (z, полуширина, вперёд, назад). Между строками --
+# плавная интерполяция; сечение -- суперэллипс (не круг и не квадрат), спереди и сзади разная глубина.
+SKULL_PROFILE = [
+    (1.572, 0.012, 0.050, 0.010),   # низ подбородка
+    (1.582, 0.034, 0.072, 0.024),   # подбородок
+    (1.598, 0.052, 0.086, 0.034),   # нижняя челюсть
+    (1.616, 0.062, 0.094, 0.042),   # нижние зубы
+    (1.632, 0.066, 0.100, 0.050),   # смыкание зубов
+    (1.650, 0.074, 0.104, 0.072),   # верхняя челюсть выступает вперёд
+    (1.672, 0.099, 0.097, 0.094),   # скулы -- самое широкое место лица
+    (1.700, 0.093, 0.094, 0.106),   # глаза
+    (1.726, 0.094, 0.100, 0.114),   # надбровья
+    (1.760, 0.099, 0.093, 0.120),   # свод -- самое широкое место черепа
+    (1.800, 0.087, 0.078, 0.106),
+    (1.828, 0.060, 0.052, 0.076),
+    (1.845, 0.022, 0.018, 0.030),   # макушка
+]
+SKULL_Y = -0.004                     # центр сечений по глубине
+JAW_Z = 1.626                        # ниже -- нижняя челюсть (кость Jaw)
+EYES = [Vector((s * 0.043, 0, 1.703)) for s in (L, R)]
+EYE_HOLE = (0.025, 0.024)            # полуоси глазницы (x, z)
+NOSE = (Vector((0, 0, 1.664)), 0.009, 0.016)  # носовое отверстие: груша, шире внизу
 
 
-def influence(d, c, r, squash=(1, 1, 1)):
-    """Вес 0..1 точки единичной сферы d относительно центра c (радиус r, эллипс squash), плавный спад."""
-    diff = Vector(((d.x - c[0]) / squash[0], (d.y - c[1]) / squash[1], (d.z - c[2]) / squash[2]))
-    t = max(0.0, 1.0 - diff.length / r)
-    return t * t * (3 - 2 * t)
+def profile_at(z):
+    rows = SKULL_PROFILE
+    for a, b in zip(rows, rows[1:]):
+        if a[0] <= z <= b[0]:
+            t = (z - a[0]) / (b[0] - a[0])
+            t = t * t * (3 - 2 * t)
+            return [a[k] + (b[k] - a[k]) * t for k in range(1, 4)]
+    return list(rows[-1][1:])
 
 
-def sculpt(d):
-    """Лепка черепа из сферы: d -- точка единичной сферы, результат -- точка в долях полуосей головы."""
-    p = d.copy()
-    if d.z < 0:                                     # к челюсти череп сужается, затылок переходит в шею
-        t = -d.z
-        p.x *= 1 - 0.36 * t * t
-        if d.y > 0:
-            p.y *= 1 - 0.3 * t
-    if p.y < -0.55:                                 # лицевая часть плоская
-        p.y = -0.55 + (p.y + 0.55) * 0.55
-    p.y += 0.1 * influence(d, (0, 0.6, 0.3), 0.8)   # затылок вытянут назад
-    p += d.normalized() * 0.1 * influence(d, (0, 0.3, 0.75), 0.75)   # свод черепа шире и выше
-    radial = d.normalized()
-    push = 0.0
-    push += 0.12 * influence(d, (0, -0.95, 0.42), 0.5, squash=(1.7, 1, 0.5))      # надбровья
-    for s in (L, R):
-        push += 0.16 * influence(d, (s * 0.72, -0.6, -0.08), 0.3)                  # скулы
-        push -= 0.12 * influence(d, (s * 0.95, -0.15, 0.2), 0.42)                  # виски
-        push -= 0.12 * influence(d, (s * 0.6, -0.5, -0.5), 0.35)                   # впадины щёк под скулами
-        push -= 0.36 * influence(d, (s * 0.42, -0.86, 0.14), 0.36, squash=(1.1, 1, 0.85))  # глазницы
-    push -= 0.22 * influence(d, (0, -0.96, -0.16), 0.2, squash=(0.8, 1, 1.4))     # носовая полость
-    push += 0.22 * influence(d, (0, -0.95, -0.45), 0.42, squash=(1.2, 1, 0.7))    # верхняя челюсть вперёд
-    push -= 0.05 * influence(d, (0, -0.95, -0.6), 0.25, squash=(2.0, 1, 0.35))    # линия рта
-    push += 0.10 * influence(d, (0, -0.8, -0.9), 0.35)                              # подбородок
-    return p + radial * push
+def head(levels=34, around=40, power=2.6):
+    """Череп одним куском из сечений; глазницы и носовая полость -- дыры, за ними тёмная полость черепа;
+    в глубине глазниц светятся миндалины с ореолом. Низ лица (ниже JAW_Z) привязан к кости Jaw."""
+    z0, z1 = SKULL_PROFILE[0][0], SKULL_PROFILE[-1][0]
+    rings = []
+    for i in range(levels):
+        z = z0 + (z1 - z0) * i / (levels - 1)
+        w, f, b = profile_at(z)
+        ring_ = []
+        for k in range(around):
+            a = 2 * math.pi * k / around                 # 0 -- лицо (-Y), по часовой
+            sx, cy = math.sin(a), math.cos(a)
+            ex = math.copysign(abs(sx) ** (2 / power), sx)
+            ey = math.copysign(abs(cy) ** (2 / power), cy)
+            depth = f if cy > 0 else b
+            x, y = w * ex, SKULL_Y - depth * ey
+            # скулы чуть выступают вбок-вперёд, виски впалые
+            side = abs(sx)
+            if 1.66 < z < 1.69:
+                x *= 1 + 0.06 * side * max(0, cy)
+            if 1.715 < z < 1.775:
+                x *= 1 - 0.05 * side * (1 - abs(cy))
+            ring_.append(bm.verts.new((x, y, z)))
+        rings.append(ring_)
+    faces = []
+    for r0, r1 in zip(rings, rings[1:]):
+        for k in range(around):
+            faces.append(bm.faces.new((r0[k], r0[(k + 1) % around], r1[(k + 1) % around], r1[k])))
+    bottom, top = bm.verts.new((0, SKULL_Y + 0.02, z0 - 0.004)), bm.verts.new((0, SKULL_Y + 0.01, z1 + 0.004))
+    for k in range(around):
+        faces.append(bm.faces.new((rings[0][(k + 1) % around], rings[0][k], bottom)))
+        faces.append(bm.faces.new((rings[-1][k], rings[-1][(k + 1) % around], top)))
+    verts = [v for r in rings for v in r] + [bottom, top]
 
-
-def head():
-    """Голова одним куском: сфера 24x16, вылепленная sculpt(); низ лица привязан к кости Jaw.
-    UV -- проекция спереди на текстуру лица SW_Skull."""
-    verts = bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=16, radius=1.0)["verts"]
-    jaw = []
+    # глазницы и нос -- вырезаем грани передней части, чей центр попал в эллипс
+    def in_hole(c):
+        if c.y > SKULL_Y - 0.04:
+            return False
+        for e in EYES:
+            if ((c.x - e.x) / EYE_HOLE[0]) ** 2 + ((c.z - e.z) / EYE_HOLE[1]) ** 2 < 1:
+                return True
+        n, rx, rz = NOSE
+        t = (c.z - n.z) / rz                             # -1 внизу .. 1 вверху
+        return abs(t) < 1 and abs(c.x) < rx * (1.15 - 0.55 * t) * math.sqrt(1 - t * t) + 0.002
+    holes = [f for f in faces if in_hole(f.calc_center_median())]
+    bmesh.ops.delete(bm, geom=holes, context="FACES_ONLY")
+    verts = [v for v in verts if v.is_valid and v.link_faces]
+    # края дыр -- на ровный эллипс (иначе ступеньки по сетке)
     for v in verts:
-        d = v.co.normalized()
-        p = sculpt(d)
-        v.co = HEAD_C + Vector((p.x * HEAD_R.x, p.y * HEAD_R.y, p.z * HEAD_R.z))
-        if d.z < -0.5 and d.y < 0.3:
-            jaw.append(v)
-    finish(verts, BONE, "Head")                    # бока и затылок -- обычная кость (кубическая проекция)
+        if not v.is_boundary:
+            continue
+        for e in EYES:
+            dx, dz = (v.co.x - e.x) / EYE_HOLE[0], (v.co.z - e.z) / EYE_HOLE[1]
+            r = math.hypot(dx, dz)
+            if 0.5 < r < 1.6:
+                v.co.x, v.co.z = e.x + dx / r * EYE_HOLE[0], e.z + dz / r * EYE_HOLE[1]
+        n, rx, rz = NOSE                             # нос -- груша, шире внизу
+        dx, dz = v.co.x / rx, (v.co.z - n.z) / rz
+        r = math.hypot(dx, dz)
+        if 0.4 < r < 1.8 and abs(v.co.x) < 0.02:
+            ux, uz = dx / r, dz / r
+            v.co.x, v.co.z = ux * rx * (1.15 - 0.55 * uz), n.z + uz * rz
+
+    finish(verts, BONE, "Head")
+    head_i, jaw_i = BONE_NAMES.index("Head"), BONE_NAMES.index("Jaw")
+    for v in verts:
+        if v.co.z < JAW_Z:
+            del v[deform][head_i]
+            v[deform][jaw_i] = 1.0
+    # лицо (передние грани у зубов) -- текстура с зубами, проекция спереди
     for f in {f for v in verts for f in v.link_faces}:
         f.normal_update()
-        if f.normal.y > -0.35:
-            continue
-        f.material_index = SKULL                   # лицо -- текстура лица, проекция спереди
-        for loop in f.loops:
-            c = loop.vert.co - HEAD_C
-            loop[uv_layer].uv = (0.5 + c.x / (2 * HEAD_R.x * 1.05), 0.5 + c.z / (2 * HEAD_R.z * 1.05))
-    head_i, jaw_i = BONE_NAMES.index("Head"), BONE_NAMES.index("Jaw")
-    for v in jaw:
-        del v[deform][head_i]
-        v[deform][jaw_i] = 1.0
-    # глаза: светящиеся миндалины на дне глазниц, не выше поверхности лица; ореол там же
-    for c in SOCKETS:
-        bottom = HEAD_C + Vector([a * r for a, r in zip(sculpt(c.normalized()), HEAD_R)])
-        s = 1 if c.x > 0 else -1
-        blob((0.026, 0.005, 0.01), EYE, "Head", segs=8, rings=4, loc=bottom + Vector((0, -0.008, 0)),
-             rot=(0, s * 16, 0))
-        glow_quad(bottom + Vector((0, -0.012, 0)), 0.1, 0.06, "Head")
+        if f.normal.y < -0.4 and f.calc_center_median().z < 1.66:
+            f.material_index = SKULL
+            for loop in f.loops:
+                c = loop.vert.co
+                loop[uv_layer].uv = (0.5 + c.x / 0.22, (c.z - 1.57) / 0.1)
+
+    # тёмная полость черепа за глазницами и носом
+    blob((0.072, 0.07, 0.07), CAVITY, "Head", segs=10, rings=6, loc=(0, SKULL_Y + 0.012, 1.705))
+    for e in EYES:
+        s = 1 if e.x > 0 else -1
+        y_face = SKULL_Y - profile_at(e.z)[1] * 0.97
+        blob((0.013, 0.004, 0.0055), EYE, "Head", segs=8, rings=4, loc=(e.x, y_face + 0.026, e.z - 0.003),
+             rot=(0, s * 18, 0))
+        glow_quad(Vector((e.x, y_face + 0.022, e.z - 0.003)), 0.04, 0.026, "Head")
 
 
-# --- голова: одна вылепленная сфера с челюстью и глазами в глазницах
+# --- голова: череп из сечений, глазницы и нос -- дыры, глаза светятся в глубине
 head()
 
 # --- позвоночник, рёбра, грудина, таз
