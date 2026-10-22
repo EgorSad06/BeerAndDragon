@@ -8,9 +8,11 @@
   Assets/Game/Assets/enemies/SkeletonWarrior/Textures/*.png       -- пиксельные текстуры 64x64
   --preview DIR: картинки модели с трёх сторон и кадры анимаций
 
-Стиль PS1: мало полигонов, жёсткий скиннинг (каждая деталь целиком на одной кости), текстуры с point-фильтром.
-Детали -- кости скелета и кожаная броня (наплечники, ремни, пояс с полами, наручи, поножи), ржавый меч,
-синее пламя в глазницах. Координаты -- метры, Z вверх, лицо к -Y (как принято в Blender).
+Стиль PS1: мало полигонов, жёсткий скиннинг (каждая деталь целиком на одной кости), сглаживание по вершинам
+(гуро-шейдинг), текстуры 64x64 с грязью, зерном и 15-битным цветом с дизерингом, point-фильтр.
+Детали: округлый череп со скуловыми дугами и челюстью-подковой; кожаная броня -- накидка на плечи с изогнутыми
+наплечниками, подтяжки (спереди по рёбрам, сзади крест), пояс с полами, наручи, обмотки; сандалии по форме стопы;
+меч; синее пламя в глазницах -- текстура из art/enemies/ref/blue_fire.webp на трёх листах крестом. Координаты -- метры, Z вверх, лицо к -Y (как принято в Blender).
 """
 import math
 import os
@@ -53,11 +55,31 @@ def noise(n, scale):
     return (out - out.min()) / (np.ptp(out) + 1e-6) * scale
 
 
-def save_texture(name, rgb):
+BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0 - 0.5
+GRIME = np.array([0.42, 0.40, 0.26])    # буро-зелёная грязь
+
+
+def ps1(rgb, grime=0.4):
+    """Огрубление «под PS1»: пятна грязи, зерно, цветовой шум, 15-битный цвет с упорядоченным дизерингом."""
     n = rgb.shape[0]
-    img = bpy.data.images.new(name, n, n, alpha=False)
-    px = np.ones((n, n, 4))
+    dirt = noise(n, 1.0)[..., None] * grime
+    rgb = rgb * (1 - dirt) + GRIME * rgb.mean(-1, keepdims=True) * dirt
+    rgb = rgb * (0.82 + 0.36 * rng.random((n, n, 1)))          # зерно
+    rgb = rgb + (rng.random((n, n, 3)) - 0.5) * 0.07           # грязный цветовой шум
+    levels = 31                                                # 5 бит на канал, как у PS1
+    dither = np.tile(BAYER, (n // 4, n // 4))[..., None] / levels
+    return np.floor(np.clip(rgb + dither, 0, 1) * levels + 0.5) / levels
+
+
+def save_texture(name, rgb, alpha=None, raw=False, grime=0.4):
+    h, w = rgb.shape[:2]
+    if not raw:
+        rgb = ps1(rgb, grime)
+    img = bpy.data.images.new(name, w, h, alpha=alpha is not None)
+    px = np.ones((h, w, 4))
     px[:, :, :3] = np.clip(rgb, 0, 1)
+    if alpha is not None:
+        px[:, :, 3] = alpha
     img.pixels = px[::-1].ravel()   # Blender хранит строки снизу вверх
     os.makedirs(TEX_DIR, exist_ok=True)
     img.filepath_raw = os.path.join(TEX_DIR, name + ".png")
@@ -69,57 +91,75 @@ def save_texture(name, rgb):
 N = 64
 def tex_bone():
     n = noise(N, 1.0)
-    base = np.array([0.82, 0.76, 0.58]) * (0.75 + 0.35 * n)[..., None]
-    grime = noise(N, 1.0) > 0.72
-    base[grime] *= 0.55
-    for _ in range(6):   # трещины
+    base = np.array([0.70, 0.64, 0.46]) * (0.8 + 0.25 * n)[..., None]
+    base[noise(N, 1.0) > 0.8] *= 0.6                           # тёмные пятна
+    base[noise(N, 1.0) > 0.86] *= np.array([0.85, 0.88, 0.7])  # зеленоватая плесень
+    for _ in range(9):   # трещины
         x, y = rng.integers(0, N, 2)
-        for _ in range(rng.integers(6, 14)):
-            base[y % N, x % N] *= 0.35
+        for _ in range(rng.integers(6, 16)):
+            base[y % N, x % N] *= 0.3
             x += rng.integers(-1, 2); y += 1
     return base
 
 
 def tex_leather():
     n = noise(N, 1.0)
-    base = np.array([0.36, 0.22, 0.12]) * (0.65 + 0.5 * n)[..., None]
-    base[noise(N, 1.0) > 0.75] *= 0.6        # потёртости
-    base[:, ::16] *= 0.5                     # швы
-    base[::4, 7::16] = [0.62, 0.52, 0.36]    # стежки
+    base = np.array([0.30, 0.19, 0.11]) * (0.55 + 0.6 * n)[..., None]
+    base[noise(N, 1.0) > 0.7] *= 0.5                           # потёртости
+    spots = noise(N, 1.0) > 0.82
+    base[spots] = base[spots] * 0.5 + 0.04                     # пятна
+    base[:, ::16] *= 0.45                                      # швы
+    base[::4, 7::16] = [0.50, 0.42, 0.28]                      # стежки
     return base
 
 
 def tex_strap():
     n = noise(N, 1.0)
-    base = np.array([0.20, 0.12, 0.07]) * (0.7 + 0.4 * n)[..., None]
-    base[:, :3] *= 1.6; base[:, -3:] *= 1.6  # светлые кромки ремня
-    for y in range(6, N, 16):                # заклёпки
-        base[y:y + 3, 30:33] = [0.55, 0.5, 0.42]
+    base = np.array([0.17, 0.11, 0.07]) * (0.65 + 0.45 * n)[..., None]
+    base[:, :3] *= 1.6; base[:, -3:] *= 1.6                    # светлые кромки ремня
+    for y in range(6, N, 16):                                  # заклёпки
+        base[y:y + 3, 30:33] = [0.45, 0.42, 0.36]
     return base
 
 
 def tex_metal():
     n = noise(N, 1.0)
-    base = np.array([0.36, 0.36, 0.38]) * (0.7 + 0.45 * n)[..., None]
-    rust = noise(N, 1.0) > 0.6
-    base[rust] = base[rust] * 0.4 + np.array([0.42, 0.2, 0.08]) * 0.6
-    base[::8, :] *= 1.15                     # царапины
+    base = np.array([0.32, 0.31, 0.30]) * (0.65 + 0.5 * n)[..., None]
+    rust = noise(N, 1.0) > 0.55
+    base[rust] = base[rust] * 0.35 + np.array([0.38, 0.18, 0.07]) * 0.65
+    base[::8, :] *= 1.15                                       # царапины
     return base
 
 
 def tex_steel():
     n = noise(N, 1.0)
-    base = np.array([0.62, 0.64, 0.68]) * (0.75 + 0.35 * n)[..., None]
-    base[noise(N, 1.0) > 0.78] *= 0.55       # пятна и зазубрины
-    base[:, N // 2 - 1:N // 2 + 1] *= 1.25   # дол посередине клинка
+    base = np.array([0.55, 0.56, 0.58]) * (0.7 + 0.4 * n)[..., None]
+    base[noise(N, 1.0) > 0.72] *= np.array([0.7, 0.55, 0.4])   # ржавые пятна
+    base[:, N // 2 - 1:N // 2 + 1] *= 1.25                     # дол посередине клинка
     return base
 
 
 def tex_cloth():
     n = noise(N, 1.0)
-    base = np.array([0.10, 0.09, 0.12]) * (0.6 + 0.6 * n)[..., None]
-    base[noise(N, 1.0) > 0.8] *= 0.4         # дыры и грязь
+    base = np.array([0.10, 0.09, 0.11]) * (0.55 + 0.7 * n)[..., None]
+    base[noise(N, 1.0) > 0.78] *= 0.35                         # дыры и грязь
     return base
+
+
+def tex_flame(w=24, h=40):
+    """Языки синего пламени из референса art/enemies/ref/blue_fire.webp: уменьшение блоками до w x h,
+    5-битный цвет; альфа -- яркость (чёрный фон прозрачный, в Unity -- аддитивное смешивание)."""
+    src = bpy.data.images.load(os.path.join(ROOT, "art", "enemies", "ref", "blue_fire.webp"))
+    sw, sh = src.size
+    a = np.array(src.pixels[:]).reshape(sh, sw, 4)[::-1, :, :3]
+    bh, bw = sh // h, sw // w
+    a = a[:bh * h, :bw * w].reshape(h, bh, w, bw, 3).mean(axis=(1, 3))
+    a = np.clip((a - 0.04) * 1.6, 0, 1)                        # глубже чёрный, ярче огонь
+    rows = np.linspace(0, 1, h)[:, None, None]
+    a *= np.clip(rows * 3, 0, 1)                               # верх языков растворяется
+    levels = 31
+    a = np.floor(a * levels + 0.5) / levels
+    return a, a.max(axis=-1)
 
 
 def material(name, img=None, emission=None, strength=0.0):
@@ -127,7 +167,7 @@ def material(name, img=None, emission=None, strength=0.0):
     m.use_nodes = True
     nt = m.node_tree
     bsdf = nt.nodes["Principled BSDF"]
-    bsdf.inputs["Roughness"].default_value = 0.85
+    bsdf.inputs["Roughness"].default_value = 0.9
     if img is not None:
         t = nt.nodes.new("ShaderNodeTexImage")
         t.image = img
@@ -140,8 +180,33 @@ def material(name, img=None, emission=None, strength=0.0):
     return m
 
 
+def flame_material(name, img, strength=4.0):
+    """Светящийся полупрозрачный огонь: цвет текстуры -- свечение, яркость -- прозрачность."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    t = nt.nodes.new("ShaderNodeTexImage")
+    t.image, t.interpolation = img, "Closest"
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Strength"].default_value = strength
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(t.outputs["Color"], em.inputs["Color"])
+    nt.links.new(t.outputs["Alpha"], mix.inputs["Fac"])
+    nt.links.new(tr.outputs[0], mix.inputs[1])
+    nt.links.new(em.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    if hasattr(m, "surface_render_method"):
+        m.surface_render_method = "BLENDED"
+    m.use_backface_culling = False
+    return m
+
+
+flame_rgb, flame_alpha = tex_flame()
 MATS = [
-    material("SW_Bone", save_texture("SW_Bone", tex_bone())),
+    material("SW_Bone", save_texture("SW_Bone", tex_bone(), grime=0.22)),
     material("SW_Leather", save_texture("SW_Leather", tex_leather())),
     material("SW_Strap", save_texture("SW_Strap", tex_strap())),
     material("SW_Metal", save_texture("SW_Metal", tex_metal())),
@@ -149,9 +214,10 @@ MATS = [
     material("SW_Steel", save_texture("SW_Steel", tex_steel())),
     material("SW_Socket", emission=(0.0, 0.0, 0.0), strength=0.0),
     material("SW_EyeFire", emission=(0.05, 0.3, 1.0), strength=4.0),
-    material("SW_EyeFlame", emission=(0.15, 0.55, 1.0), strength=3.0),
+    flame_material("SW_EyeFlame", save_texture("SW_EyeFlame", flame_rgb, alpha=flame_alpha, raw=True)),
 ]
 BONE, LEATHER, STRAP, METAL, CLOTH, STEEL, SOCKET, EYE, FLAME = range(len(MATS))
+FLAT = {METAL, STEEL, SOCKET, FLAME}   # без сглаживания: металл с гранями, плоские языки огня
 
 # ---------------------------------------------------------------- кости рига (голова, хвост) -- T-поза
 L, R = 1, -1
@@ -182,7 +248,7 @@ deform = bm.verts.layers.deform.verify()
 uv_layer = bm.loops.layers.uv.verify()
 
 
-def finish(verts, mat, bone, uv_scale=2.0):
+def finish(verts, mat, bone, uv_scale=4.0, keep_uv=False):
     """Материал, жёсткая привязка к кости и кубическая проекция UV для только что созданных вершин."""
     gi = BONE_NAMES.index(bone)
     vs = set(verts)
@@ -192,6 +258,8 @@ def finish(verts, mat, bone, uv_scale=2.0):
     for f in faces:
         f.material_index = mat
         f.normal_update()
+        if keep_uv:
+            continue
         nx, ny, nz = (abs(c) for c in f.normal)
         for loop in f.loops:
             c = loop.vert.co
@@ -202,7 +270,7 @@ def finish(verts, mat, bone, uv_scale=2.0):
 def place(verts, loc=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
     if isinstance(scale, (int, float)):
         scale = (scale, scale, scale)
-    m =Matrix.LocRotScale(Vector(loc), Euler([math.radians(a) for a in rot]), Vector(scale))
+    m = Matrix.LocRotScale(Vector(loc), Euler([math.radians(a) for a in rot]), Vector(scale))
     bmesh.ops.transform(bm, matrix=m, verts=list(verts))
 
 
@@ -261,87 +329,181 @@ def ring(center, radius, minor, mat, bone, segs=8, scale=(1, 1, 1), rot=(0, 0, 0
     return verts
 
 
-# --- голова: череп (свод, надбровья, скулы, верхняя челюсть с зубами), глазницы с синим пламенем, челюсть
-blob((0.1, 0.112, 0.105), BONE, "Head", segs=10, rings=7, loc=(0, 0.005, 1.735))           # свод черепа
-box((0.15, 0.035, 0.03), BONE, "Head", loc=(0, -0.095, 1.745), rot=(-10, 0, 0))             # надбровья
+def shell(center, radius, length, a0, a1, mat, bone, steps=5, thick=0.012, taper=1.0, rot=(0, 0, 0)):
+    """Изогнутая пластина (наплечник): часть трубы вдоль оси X, дуга a0..a1 градусов от +Z к -Y, с толщиной."""
+    rows = []
+    for i in range(steps + 1):
+        a = math.radians(a0 + (a1 - a0) * i / steps)
+        row = []
+        for x, rr in ((-length / 2, radius), (length / 2, radius * taper)):
+            for r in (rr, rr + thick):
+                row.append(bm.verts.new((x, -math.sin(a) * r, math.cos(a) * r)))
+        rows.append(row)          # [x0 внутр., x0 наруж., x1 внутр., x1 наруж.]
+    for a, b in zip(rows, rows[1:]):
+        bm.faces.new((a[1], a[3], b[3], b[1]))
+        bm.faces.new((a[0], b[0], b[2], a[2]))
+        bm.faces.new((a[0], a[1], b[1], b[0]))
+        bm.faces.new((a[2], b[2], b[3], a[3]))
+    for r in (rows[0], rows[-1]):
+        bm.faces.new((r[0], r[2], r[3], r[1]))
+    verts = [v for r in rows for v in r]
+    place(verts, loc=center, rot=rot)
+    finish(verts, mat, bone)
+    return verts
+
+
+def strap(points, width, thick, mat, bone):
+    """Плоский ремень по ломаной: по бруску на каждый отрезок, ширина -- по оси X мира."""
+    for p1, p2 in zip(points, points[1:]):
+        p1, p2 = Vector(p1), Vector(p2)
+        d = p2 - p1
+        v = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+        bmesh.ops.scale(bm, vec=(width, thick, d.length * 1.08), verts=v)
+        rot = Vector((0, 0, 1)).rotation_difference(d.normalized())
+        bmesh.ops.transform(bm, matrix=Matrix.Translation((p1 + p2) / 2) @ rot.to_matrix().to_4x4(), verts=v)
+        finish(v, mat, bone, uv_scale=6.0)
+
+
+def sole(cx, outline, z0, z1, mat, bone):
+    """Подошва сандалии: контур стопы (x, y) выдавлен от z0 до z1."""
+    bot = [bm.verts.new((cx + x, y, z0)) for x, y in outline]
+    top = [bm.verts.new((cx + x, y, z1)) for x, y in outline]
+    bm.faces.new(top)
+    bm.faces.new(list(reversed(bot)))
+    n = len(outline)
+    for k in range(n):
+        bm.faces.new((bot[k], bot[(k + 1) % n], top[(k + 1) % n], top[k]))
+    finish(bot + top, mat, bone)
+
+
+def flame(base, width, height, bone, lean=(0, 0.02)):
+    """Язык огня: три вертикальных листа крестом (через 60°) с текстурой пламени во всю площадь."""
+    bx, by, bz = base
+    for k in range(3):
+        a = math.radians(60 * k)
+        dx, dy = math.cos(a) * width / 2, math.sin(a) * width / 2
+        quad = [bm.verts.new((bx - dx, by - dy, bz)), bm.verts.new((bx + dx, by + dy, bz)),
+                bm.verts.new((bx + dx + lean[0], by + dy + lean[1], bz + height)),
+                bm.verts.new((bx - dx + lean[0], by - dy + lean[1], bz + height))]
+        f = bm.faces.new(quad)
+        for loop, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            loop[uv_layer].uv = uv
+        finish(quad, FLAME, bone, keep_uv=True)
+
+
+# --- голова: округлый череп, скуловые дуги, челюсть подковой с ветвями до височного сустава
+blob((0.1, 0.114, 0.106), BONE, "Head", segs=12, rings=8, loc=(0, 0.008, 1.737))           # свод черепа
 for s in (L, R):
-    box((0.035, 0.05, 0.03), BONE, "Head", loc=(s * 0.062, -0.075, 1.69), rot=(0, 0, s * 15))  # скулы
-box((0.1, 0.05, 0.04), BONE, "Head", loc=(0, -0.085, 1.66))                                 # верхняя челюсть
-for k in range(6):
-    box((0.012, 0.012, 0.02), BONE, "Head", loc=(-0.035 + k * 0.014, -0.11, 1.637))         # верхние зубы
+    rod((0, -0.1, 1.752), (s * 0.085, -0.08, 1.742), 0.016, BONE, "Head", segs=6)          # надбровная дуга
+    rod((s * 0.055, -0.088, 1.688), (s * 0.094, -0.02, 1.7), 0.013, BONE, "Head", segs=6)   # скуловая дуга
+    blob((0.024, 0.026, 0.02), BONE, "Head", segs=6, rings=4, loc=(s * 0.058, -0.08, 1.685))  # скула
+blob((0.056, 0.042, 0.032), BONE, "Head", segs=8, rings=5, loc=(0, -0.08, 1.662))          # верхняя челюсть
 for s in (L, R):
-    blob((0.034, 0.02, 0.03), SOCKET, "Head", segs=6, rings=4, loc=(s * 0.042, -0.097, 1.71))
-    blob(0.012, EYE, "Head", segs=6, rings=4, loc=(s * 0.042, -0.108, 1.71))
-    rod((s * 0.042, -0.108, 1.718), (s * 0.04, -0.1, 1.76), 0.009, FLAME, "Head", r2=0.0, segs=4)
-rod((0, -0.118, 1.69), (0, -0.112, 1.665), 0.012, SOCKET, "Head", r2=0.004, segs=3)         # носовая дыра
-box((0.1, 0.08, 0.03), BONE, "Jaw", loc=(0, -0.07, 1.6))
-for k in range(6):
-    box((0.012, 0.012, 0.018), BONE, "Jaw", loc=(-0.035 + k * 0.014, -0.105, 1.62))         # нижние зубы
+    blob((0.028, 0.02, 0.027), SOCKET, "Head", segs=8, rings=5, loc=(s * 0.041, -0.099, 1.712))
+    blob(0.012, EYE, "Head", segs=6, rings=4, loc=(s * 0.042, -0.11, 1.708))
+    flame((s * 0.041, -0.112, 1.698), 0.07, 0.13, "Head", lean=(s * 0.01, 0.03))
+rod((0, -0.12, 1.692), (0, -0.112, 1.666), 0.012, SOCKET, "Head", r2=0.004, segs=3)         # носовая дыра
+ring((0, -0.062, 1.638), 0.044, 0.01, BONE, "Head", segs=7, arc=150, scale=(1, 0.85, 1.5))  # верхние зубы
+ring((0, -0.058, 1.603), 0.05, 0.015, BONE, "Jaw", segs=8, arc=200, scale=(1, 0.9, 1.1))    # нижняя челюсть
+ring((0, -0.06, 1.622), 0.043, 0.009, BONE, "Jaw", segs=7, arc=150, scale=(1, 0.85, 1.4))   # нижние зубы
+blob((0.022, 0.016, 0.018), BONE, "Jaw", segs=6, rings=4, loc=(0, -0.106, 1.598))           # подбородок
+for s in (L, R):
+    rod((s * 0.05, -0.032, 1.603), (s * 0.074, -0.012, 1.665), 0.012, BONE, "Jaw", segs=6)  # ветвь до сустава
 
 # --- позвоночник, рёбра, грудина, таз
-rod((0, 0, 1.0), (0, 0, 1.5), 0.022, BONE, "Spine", segs=5)
-rod((0, 0, 1.48), (0, 0, 1.6), 0.02, BONE, "Neck", segs=5)
+rod((0, 0, 1.0), (0, 0, 1.5), 0.022, BONE, "Spine", segs=6)
+rod((0, 0, 1.48), (0, 0, 1.6), 0.02, BONE, "Neck", segs=6)
+for z in (1.52, 1.56):
+    blob((0.03, 0.026, 0.012), BONE, "Neck", segs=6, rings=3, loc=(0, 0.004, z))           # позвонки шеи
 for i, (z, rad) in enumerate(((1.42, 0.13), (1.37, 0.14), (1.32, 0.14), (1.27, 0.13), (1.22, 0.11))):
-    ring((0, -0.02, z), rad, 0.014, BONE, "Chest" if i < 3 else "Spine", segs=10, scale=(1, 0.75, 1), arc=320)
-box((0.03, 0.02, 0.2), BONE, "Chest", loc=(0, -0.12, 1.33))                 # грудина
-box((0.3, 0.05, 0.03), BONE, "Chest", loc=(0, 0.01, 1.455))                 # ключицы
-blob((0.14, 0.09, 0.07), BONE, "Hips", segs=8, rings=4, loc=(0, 0, 0.99))   # таз
+    ring((0, -0.02, z), rad, 0.014, BONE, "Chest" if i < 3 else "Spine", segs=12, scale=(1, 0.75, 1), arc=320)
+rod((0, -0.122, 1.43), (0, -0.12, 1.24), 0.016, BONE, "Chest", segs=5)                     # грудина
+for s in (L, R):
+    rod((s * 0.02, -0.06, 1.46), (s * 0.17, 0.0, 1.455), 0.013, BONE, "Chest", segs=5)     # ключица
+blob((0.14, 0.09, 0.07), BONE, "Hips", segs=10, rings=5, loc=(0, 0, 0.99))                 # таз
 
-# --- руки: плечевые и локтевые кости, кисти с когтями
+# --- руки и ноги
 for s, side in ((L, "L"), (R, "R")):
-    rod((s * 0.18, 0, 1.45), (s * 0.46, 0, 1.45), 0.024, BONE, f"UpperArm.{side}")
-    rod((s * 0.46, 0, 1.45), (s * 0.72, 0, 1.45), 0.02, BONE, f"LowerArm.{side}")
-    box((0.08, 0.05, 0.025), BONE, f"Hand.{side}", loc=(s * 0.765, 0, 1.45))
-    for k, dy in enumerate((-0.018, 0.0, 0.018)):
+    rod((s * 0.18, 0, 1.45), (s * 0.46, 0, 1.45), 0.024, BONE, f"UpperArm.{side}", segs=6)
+    blob(0.026, BONE, f"LowerArm.{side}", segs=6, rings=4, loc=(s * 0.46, 0, 1.45))         # локоть
+    rod((s * 0.46, 0, 1.45), (s * 0.72, 0, 1.45), 0.02, BONE, f"LowerArm.{side}", segs=6)
+    blob((0.04, 0.03, 0.015), BONE, f"Hand.{side}", segs=6, rings=4, loc=(s * 0.765, 0, 1.45))
+    for dy in (-0.018, 0.0, 0.018):
         rod((s * 0.8, dy, 1.45), (s * 0.86, dy - 0.004, 1.43), 0.008, BONE, f"Hand.{side}", r2=0.002, segs=4)
     rod((s * 0.79, -0.03, 1.45), (s * 0.82, -0.06, 1.44), 0.008, BONE, f"Hand.{side}", r2=0.002, segs=4)
 
-    # ноги: бедро и голень -- кость, стопа в сапоге
-    rod((s * 0.10, 0, 0.97), (s * 0.10, 0, 0.55), 0.03, BONE, f"UpperLeg.{side}")
-    rod((s * 0.10, 0, 0.54), (s * 0.10, 0, 0.12), 0.024, BONE, f"LowerLeg.{side}")
-    blob(0.04, BONE, f"LowerLeg.{side}", segs=6, rings=4, loc=(s * 0.10, -0.01, 0.54))   # колено
+    rod((s * 0.10, 0, 0.97), (s * 0.10, 0, 0.55), 0.03, BONE, f"UpperLeg.{side}", segs=6)
+    rod((s * 0.10, 0, 0.54), (s * 0.10, 0, 0.1), 0.024, BONE, f"LowerLeg.{side}", segs=6)
+    blob(0.04, BONE, f"LowerLeg.{side}", segs=8, rings=5, loc=(s * 0.10, -0.01, 0.54))     # колено
 
-    # --- кожаная броня
-    blob((0.11, 0.12, 0.08), LEATHER, f"UpperArm.{side}", segs=8, rings=4,
-         loc=(s * 0.21, 0, 1.475), rot=(0, s * 20, 0))                                    # наплечник
-    blob((0.08, 0.09, 0.05), STRAP, f"UpperArm.{side}", segs=8, rings=4,
-         loc=(s * 0.23, 0, 1.51), rot=(0, s * 25, 0))                                     # второй слой
-    rod((s * 0.56, 0, 1.45), (s * 0.71, 0, 1.45), 0.042, LEATHER, f"LowerArm.{side}", r2=0.036, segs=6)  # наруч
-    ring((s * 0.6, 0, 1.45), 0.044, 0.006, STRAP, f"LowerArm.{side}", segs=6, rot=(0, 90, 0))
-    rod((s * 0.10, 0, 0.42), (s * 0.10, 0, 0.14), 0.048, LEATHER, f"LowerLeg.{side}", r2=0.042, segs=6)  # поножи
-    ring((s * 0.10, 0, 0.36), 0.05, 0.006, STRAP, f"LowerLeg.{side}", segs=6)
-    box((0.1, 0.22, 0.08), LEATHER, f"Foot.{side}", loc=(s * 0.10, -0.05, 0.04))         # сапог
-    box((0.1, 0.06, 0.06), STRAP, f"Foot.{side}", loc=(s * 0.10, -0.15, 0.03))            # носок
-    # полы кожаной юбки, по две на ногу
-    for fy, rx in ((-0.09, -8), (0.08, 8)):
-        box((0.12, 0.02, 0.24), LEATHER, f"UpperLeg.{side}", loc=(s * 0.11, fy, 0.84), rot=(rx, 0, 0))
+    # стопа: пятка, плюсна, пальцы -- кость; сандалия: подошва по форме стопы, ремешки
+    x = s * 0.10
+    blob((0.028, 0.038, 0.03), BONE, f"Foot.{side}", segs=6, rings=4, loc=(x, 0.012, 0.05))
+    for dx in (-0.024, 0.0, 0.024):
+        rod((x + dx * 0.6, -0.02, 0.058), (x + dx, -0.12, 0.03), 0.009, BONE, f"Foot.{side}", segs=5)
+        rod((x + dx, -0.12, 0.03), (x + dx * 1.15, -0.168, 0.022), 0.007, BONE, f"Foot.{side}", r2=0.004, segs=4)
+    outline = [(0, 0.055), (s * 0.034, 0.04), (s * 0.044, -0.05), (s * 0.052, -0.13), (s * 0.04, -0.18),
+               (0, -0.192), (-s * 0.036, -0.178), (-s * 0.046, -0.12), (-s * 0.036, -0.04), (-s * 0.03, 0.038)]
+    sole(x, outline if s == L else list(reversed(outline)), 0.0, 0.014, STRAP, f"Foot.{side}")
+    ring((x, -0.1, 0.03), 0.042, 0.007, STRAP, f"Foot.{side}", segs=8, scale=(1.15, 1, 0.7), rot=(90, 0, 0))
+    ring((x, -0.035, 0.05), 0.04, 0.007, STRAP, f"Foot.{side}", segs=8, scale=(1.1, 1, 0.9), rot=(70, 0, 0))
+    ring((x, 0.0, 0.11), 0.034, 0.008, STRAP, f"LowerLeg.{side}", segs=8)                 # ремешок на щиколотке
 
-# --- корпус брони: ремни крест-накрест через рёбра, ворот, пояс с пряжкой
-rod((0.16, -0.11, 1.46), (-0.12, -0.13, 1.14), 0.022, STRAP, "Chest", segs=4)
-rod((-0.16, -0.11, 1.46), (0.10, -0.13, 1.2), 0.018, STRAP, "Chest", segs=4)
-rod((0.16, 0.09, 1.46), (-0.12, 0.1, 1.14), 0.022, STRAP, "Chest", segs=4)
-rod((0, 0, 1.43), (0, 0, 1.53), 0.14, LEATHER, "Chest", r2=0.07, segs=8)                 # ворот-капюшон
-ring((0, 0, 1.08), 0.15, 0.025, LEATHER, "Hips", segs=10, scale=(1, 0.8, 1.4))          # пояс
-box((0.06, 0.02, 0.05), METAL, "Hips", loc=(0, -0.125, 1.08))                            # пряжка
-box((0.3, 0.02, 0.16), CLOTH, "Hips", loc=(0, 0.11, 0.98), rot=(10, 0, 0))               # рваная ткань сзади
+    # кожаная броня рук и ног
+    rod((s * 0.56, 0, 1.45), (s * 0.71, 0, 1.45), 0.042, LEATHER, f"LowerArm.{side}", r2=0.036, segs=8)  # наруч
+    ring((s * 0.6, 0, 1.45), 0.044, 0.006, STRAP, f"LowerArm.{side}", segs=8, rot=(0, 90, 0))
+    ring((s * 0.68, 0, 1.45), 0.039, 0.006, STRAP, f"LowerArm.{side}", segs=8, rot=(0, 90, 0))
+    rod((s * 0.10, 0, 0.44), (s * 0.10, 0, 0.17), 0.048, LEATHER, f"LowerLeg.{side}", r2=0.04, segs=8)  # обмотка
+    for z in (0.38, 0.26):
+        ring((s * 0.10, 0, z), 0.05 - (0.38 - z) * 0.03, 0.006, STRAP, f"LowerLeg.{side}", segs=8)
+
+    # наплечник: две изогнутые пластины, первая продолжает накидку, вторая лежит на плече
+    shell((s * 0.24, 0.0, 1.43), 0.1, 0.16, -88, 88, LEATHER, f"Shoulder.{side}", steps=8, taper=0.92,
+          rot=(0, s * 22, 0))
+    shell((s * 0.33, 0.0, 1.4), 0.088, 0.11, -82, 82, STRAP, f"UpperArm.{side}", steps=8, taper=0.9,
+          rot=(0, s * 34, 0))
+    for dy in (-0.06, 0.06):
+        blob(0.011, METAL, f"Shoulder.{side}", segs=5, rings=3, loc=(s * 0.235, dy, 1.53))    # заклёпки
+
+    # подтяжки: спереди по рёбрам до пояса, сзади крест-накрест
+    strap([(s * 0.085, -0.07, 1.5), (s * 0.085, -0.13, 1.43), (s * 0.085, -0.15, 1.33),
+           (s * 0.082, -0.142, 1.21), (s * 0.08, -0.125, 1.1)], 0.034, 0.008, STRAP, "Chest")
+    box((0.04, 0.012, 0.03), METAL, "Hips", loc=(s * 0.08, -0.13, 1.105))                  # зажим подтяжки
+    strap([(s * 0.085, 0.06, 1.5), (s * 0.03, 0.11, 1.32), (-s * 0.08, 0.115, 1.1)], 0.032, 0.008, STRAP, "Chest")
+
+    # полы кожаной юбки: висят прямо из-под пояса, спереди, сзади и сбоку
+    for fy, rx in ((-0.12, -6), (0.115, 6)):
+        box((0.11, 0.016, 0.23), LEATHER, f"UpperLeg.{side}", loc=(s * 0.075, fy, 0.935), rot=(rx, 0, 0))
+    box((0.016, 0.1, 0.2), LEATHER, f"UpperLeg.{side}", loc=(s * 0.155, 0.0, 0.95), rot=(0, s * -8, 0))
+
+# --- корпус брони: накидка на плечи от шеи (с ней сходятся наплечники), ворот, пояс с пряжкой
+yoke = bmesh.ops.create_cone(bm, cap_ends=False, segments=12, radius1=0.27, radius2=0.072, depth=0.1)["verts"]
+place(yoke, scale=(1, 0.6, 1))
+place(yoke, loc=(0, 0, 1.485))
+finish(yoke, LEATHER, "Chest")
+ring((0, 0, 1.535), 0.074, 0.016, STRAP, "Chest", segs=10, scale=(1, 0.7, 1))                # ворот
+ring((0, 0, 1.08), 0.15, 0.025, LEATHER, "Hips", segs=12, scale=(1, 0.8, 1.4))               # пояс
+box((0.06, 0.02, 0.05), METAL, "Hips", loc=(0, -0.125, 1.08))                                 # пряжка
+box((0.26, 0.02, 0.16), CLOTH, "Hips", loc=(0, 0.125, 0.98), rot=(8, 0, 0))                    # рваная ткань сзади
 
 # --- меч в правой руке (вдоль -Y от кисти)
-rod((-0.79, 0.04, 1.45), (-0.79, -0.06, 1.45), 0.014, STRAP, "Sword", segs=5)            # рукоять
-box((0.03, 0.025, 0.025), METAL, "Sword", loc=(-0.79, 0.055, 1.45))                      # навершие
-box((0.18, 0.025, 0.025), METAL, "Sword", loc=(-0.79, -0.07, 1.45))                      # гарда
-v = box((0.06, 0.7, 0.012), STEEL, "Sword", loc=(-0.79, -0.43, 1.45))                   # клинок
+rod((-0.79, 0.04, 1.45), (-0.79, -0.06, 1.45), 0.014, STRAP, "Sword", segs=6)                # рукоять
+blob(0.02, METAL, "Sword", segs=6, rings=4, loc=(-0.79, 0.055, 1.45))                        # навершие
+box((0.18, 0.025, 0.025), METAL, "Sword", loc=(-0.79, -0.07, 1.45))                           # гарда
+v = box((0.06, 0.7, 0.012), STEEL, "Sword", loc=(-0.79, -0.43, 1.45))                        # клинок
 tip = [x for x in v if x.co.y < -0.7]
 for x in tip:
     x.co.x = -0.79
 
 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
+bmesh.ops.recalc_face_normals(bm, faces=[f for f in bm.faces if f.material_index != FLAME])
 mesh = bpy.data.meshes.new("SkeletonWarrior")
 bm.to_mesh(mesh)
 bm.free()
 for m in MATS:
     mesh.materials.append(m)
 for p in mesh.polygons:
-    p.use_smooth = False
+    p.use_smooth = p.material_index not in FLAT   # сглаживание по вершинам, как гуро-шейдинг PS1
 body = bpy.data.objects.new("SkeletonWarrior", mesh)
 scene.collection.objects.link(body)
 for name in BONE_NAMES:

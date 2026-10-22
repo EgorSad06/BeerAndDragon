@@ -1,11 +1,14 @@
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 // Настройки импорта моделей врагов из Assets/Game/Assets/enemies (их собирают скрипты tools/blender/*.py):
 //  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo);
 //  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены;
-//  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия.
+//  - материалы: матовые; *EyeFire светится синим (HDR); *EyeFlame -- аддитивный огонь с текстурой Textures/<имя>.png;
+//  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у огня края не повторяются (Clamp).
 public class EnemyModelImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Assets/enemies/";
@@ -39,20 +42,40 @@ public class EnemyModelImporter : AssetPostprocessor
         m.clipAnimations = clips;
     }
 
-    // FBX не переносит свечение в URP: глаза (*EyeFire, *EyeFlame) светятся синим в HDR, остальное матовое
+    // FBX не переносит в URP свечение и прозрачность -- задаём здесь
     void OnPostprocessMaterial(Material material)
     {
         if (!IsEnemyAsset) return;
         material.SetFloat("_Smoothness", 0.05f);
-        Color glow = material.name.EndsWith("EyeFire") ? new Color(0.05f, 0.3f, 1f) * 6f
-                   : material.name.EndsWith("EyeFlame") ? new Color(0.15f, 0.55f, 1f) * 4f
-                   : Color.black;
-        if (glow == Color.black) return;
-        glow.a = 1f;
+        if (material.name.EndsWith("EyeFlame")) MakeAdditiveFlame(material);
+        else if (material.name.EndsWith("EyeFire")) MakeGlow(material, new Color(0.05f, 0.3f, 1f) * 6f);
+    }
+
+    private static void MakeGlow(Material material, Color hdr)
+    {
+        hdr.a = 1f;
         material.SetColor("_BaseColor", new Color(0.3f, 0.6f, 1f));
-        material.SetColor("_EmissionColor", glow);
+        material.SetColor("_EmissionColor", hdr);
         material.EnableKeyword("_EMISSION");
         material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+    }
+
+    // Огонь: Unlit, аддитивно (чёрный фон текстуры не виден), двусторонний, без записи глубины
+    private void MakeAdditiveFlame(Material material)
+    {
+        material.shader = Shader.Find("Universal Render Pipeline/Unlit");
+        string tex = Path.Combine(Path.GetDirectoryName(assetPath), "Textures", material.name + ".png").Replace('\\', '/');
+        material.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex));
+        material.SetColor("_BaseColor", Color.white);
+        material.SetFloat("_Surface", 1f);
+        material.SetFloat("_Blend", 2f);   // Additive
+        material.SetFloat("_SrcBlend", (float)BlendMode.One);
+        material.SetFloat("_DstBlend", (float)BlendMode.One);
+        material.SetFloat("_ZWrite", 0f);
+        material.SetFloat("_Cull", (float)CullMode.Off);
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.SetOverrideTag("RenderType", "Transparent");
+        material.renderQueue = (int)RenderQueue.Transparent;
     }
 
     void OnPreprocessTexture()
@@ -62,5 +85,7 @@ public class EnemyModelImporter : AssetPostprocessor
         t.filterMode = FilterMode.Point;
         t.mipmapEnabled = false;
         t.textureCompression = TextureImporterCompression.Uncompressed;
+        if (Path.GetFileNameWithoutExtension(assetPath).EndsWith("EyeFlame"))
+            t.wrapMode = TextureWrapMode.Clamp;
     }
 }
