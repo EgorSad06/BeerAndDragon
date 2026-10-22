@@ -39,6 +39,22 @@ public class EnemyModelImporter : AssetPostprocessor
         m.clipAnimations = clips;
     }
 
+    // FBX не переносит свечение в URP: глаза (*EyeFire, *EyeFlame) светятся синим в HDR, остальное матовое
+    void OnPostprocessMaterial(Material material)
+    {
+        if (!IsEnemyAsset) return;
+        material.SetFloat("_Smoothness", 0.05f);
+        Color glow = material.name.EndsWith("EyeFire") ? new Color(0.05f, 0.3f, 1f) * 6f
+                   : material.name.EndsWith("EyeFlame") ? new Color(0.15f, 0.55f, 1f) * 4f
+                   : Color.black;
+        if (glow == Color.black) return;
+        glow.a = 1f;
+        material.SetColor("_BaseColor", new Color(0.3f, 0.6f, 1f));
+        material.SetColor("_EmissionColor", glow);
+        material.EnableKeyword("_EMISSION");
+        material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+    }
+
     void OnPreprocessTexture()
     {
         if (!IsEnemyAsset) return;
