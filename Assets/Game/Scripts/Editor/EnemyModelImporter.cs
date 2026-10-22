@@ -7,8 +7,8 @@ using UnityEngine.Rendering;
 // Настройки импорта моделей врагов из Assets/Game/Assets/enemies (их собирают скрипты tools/blender/*.py):
 //  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo);
 //  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены;
-//  - материалы: матовые; *EyeFire светится синим (HDR); *EyeFlame -- аддитивный огонь с текстурой Textures/<имя>.png;
-//  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у огня края не повторяются (Clamp).
+//  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
+//  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у ореола края не повторяются (Clamp).
 public class EnemyModelImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Assets/enemies/";
@@ -47,7 +47,7 @@ public class EnemyModelImporter : AssetPostprocessor
     {
         if (!IsEnemyAsset) return;
         material.SetFloat("_Smoothness", 0.05f);
-        if (material.name.EndsWith("EyeFlame")) MakeAdditiveFlame(material);
+        if (material.name.EndsWith("EyeGlow")) MakeAdditiveGlow(material);
         else if (material.name.EndsWith("EyeFire")) MakeGlow(material, new Color(0.05f, 0.3f, 1f) * 6f);
     }
 
@@ -60,8 +60,8 @@ public class EnemyModelImporter : AssetPostprocessor
         material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
     }
 
-    // Огонь: Unlit, аддитивно (чёрный фон текстуры не виден), двусторонний, без записи глубины
-    private void MakeAdditiveFlame(Material material)
+    // Ореол: Unlit, аддитивно (чёрный фон текстуры не виден), двусторонний, без записи глубины
+    private void MakeAdditiveGlow(Material material)
     {
         material.shader = Shader.Find("Universal Render Pipeline/Unlit");
         string tex = Path.Combine(Path.GetDirectoryName(assetPath), "Textures", material.name + ".png").Replace('\\', '/');
@@ -85,7 +85,7 @@ public class EnemyModelImporter : AssetPostprocessor
         t.filterMode = FilterMode.Point;
         t.mipmapEnabled = false;
         t.textureCompression = TextureImporterCompression.Uncompressed;
-        if (Path.GetFileNameWithoutExtension(assetPath).EndsWith("EyeFlame"))
+        if (Path.GetFileNameWithoutExtension(assetPath).EndsWith("EyeGlow"))
             t.wrapMode = TextureWrapMode.Clamp;
     }
 }

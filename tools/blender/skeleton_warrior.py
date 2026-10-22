@@ -10,9 +10,10 @@
 
 Стиль PS1: мало полигонов, жёсткий скиннинг (каждая деталь целиком на одной кости), сглаживание по вершинам
 (гуро-шейдинг), текстуры 64x64 с грязью, зерном и 15-битным цветом с дизерингом, point-фильтр.
-Детали: округлый череп со скуловыми дугами и челюстью-подковой; кожаная броня -- накидка на плечи с изогнутыми
-наплечниками, подтяжки (спереди по рёбрам, сзади крест), пояс с полами, наручи, обмотки; сандалии по форме стопы;
-меч; синее пламя в глазницах -- текстура из art/enemies/ref/blue_fire.webp на трёх листах крестом. Координаты -- метры, Z вверх, лицо к -Y (как принято в Blender).
+Детали: голова -- одна сфера, «вылепленная» смещением вершин (глазницы, нос, скулы, челюсть), низ лица на кости
+Jaw, лицо нарисовано на текстуре SW_Skull; в глазницах синие светящиеся миндалины с ореолом, не выше поверхности
+лица; кожаная броня -- накидка на плечи с круглыми наплечниками до ворота, подтяжки (спереди по рёбрам, сзади
+крест), пояс с полами, наручи, обмотки; сандалии по форме стопы; меч. Координаты -- метры, Z вверх, лицо к -Y (как принято в Blender).
 """
 import math
 import os
@@ -146,20 +147,39 @@ def tex_cloth():
     return base
 
 
-def tex_flame(w=24, h=40):
-    """Языки синего пламени из референса art/enemies/ref/blue_fire.webp: уменьшение блоками до w x h,
-    5-битный цвет; альфа -- яркость (чёрный фон прозрачный, в Unity -- аддитивное смешивание)."""
-    src = bpy.data.images.load(os.path.join(ROOT, "art", "enemies", "ref", "blue_fire.webp"))
-    sw, sh = src.size
-    a = np.array(src.pixels[:]).reshape(sh, sw, 4)[::-1, :, :3]
-    bh, bw = sh // h, sw // w
-    a = a[:bh * h, :bw * w].reshape(h, bh, w, bw, 3).mean(axis=(1, 3))
-    a = np.clip((a - 0.04) * 1.6, 0, 1)                        # глубже чёрный, ярче огонь
-    rows = np.linspace(0, 1, h)[:, None, None]
-    a *= np.clip(rows * 3, 0, 1)                               # верх языков растворяется
-    levels = 31
-    a = np.floor(a * levels + 0.5) / levels
-    return a, a.max(axis=-1)
+def tex_skull():
+    """Лицо черепа на планарной проекции спереди (u -- ширина головы, v -- высота): глазницы, нос, зубы, тени."""
+    base = tex_bone()
+    yy, xx = np.mgrid[0:N, 0:N]
+    u, v = (xx + 0.5) / N, 1 - (yy + 0.5) / N
+
+    def ellipse(cu, cv, ru, rv):
+        return ((u - cu) / ru) ** 2 + ((v - cv) / rv) ** 2
+
+    for cu in (0.3, 0.7):                                       # глазницы: тёмная середина, бурый край
+        e = ellipse(cu, 0.6, 0.15, 0.12)
+        base[e < 1.6] *= 0.55
+        base[e < 1.0] = np.array([0.06, 0.05, 0.04])
+        e2 = ellipse(cu, 0.45, 0.16, 0.06)                      # тень под скулой
+        base[e2 < 1.0] *= 0.7
+    nose = (np.abs(u - 0.5) < 0.06 * (v - 0.36) / 0.12) & (v > 0.36) & (v < 0.48)
+    base[nose] = np.array([0.07, 0.06, 0.05])                   # носовая полость (треугольник)
+    teeth = (v > 0.19) & (v < 0.33) & (np.abs(u - 0.5) < 0.17)
+    base[teeth] = np.array([0.78, 0.72, 0.55]) * (0.85 + 0.2 * noise(N, 1.0)[teeth])[:, None]
+    gaps = teeth & (((u - 0.5) / 0.042 % 1) < 0.22)
+    base[gaps] *= 0.3                                           # промежутки между зубами
+    base[(np.abs(v - 0.26) < 0.012) & (np.abs(u - 0.5) < 0.18)] = np.array([0.08, 0.06, 0.05])  # смыкание рядов
+    return base
+
+
+def tex_glow(n=16):
+    """Мягкий синий ореол глаза: яркий центр, гаснет к краю (в Unity -- аддитивно)."""
+    yy, xx = np.mgrid[0:n, 0:n]
+    r = np.sqrt(((xx + 0.5) / n - 0.5) ** 2 / 0.25 + ((yy + 0.5) / n - 0.5) ** 2 / 0.12)
+    k = np.clip(1 - r, 0, 1) ** 1.6
+    rgb = np.array([0.1, 0.45, 1.0]) * k[..., None] + np.clip(k - 0.6, 0, 1)[..., None] * 1.2
+    rgb = np.floor(np.clip(rgb, 0, 1) * 31 + 0.5) / 31
+    return rgb, rgb.max(axis=-1)
 
 
 def material(name, img=None, emission=None, strength=0.0):
@@ -181,7 +201,7 @@ def material(name, img=None, emission=None, strength=0.0):
 
 
 def flame_material(name, img, strength=4.0):
-    """Светящийся полупрозрачный огонь: цвет текстуры -- свечение, яркость -- прозрачность."""
+    """Светящийся полупрозрачный ореол: цвет текстуры -- свечение, яркость -- прозрачность."""
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
@@ -204,7 +224,7 @@ def flame_material(name, img, strength=4.0):
     return m
 
 
-flame_rgb, flame_alpha = tex_flame()
+glow_rgb, glow_alpha = tex_glow()
 MATS = [
     material("SW_Bone", save_texture("SW_Bone", tex_bone(), grime=0.22)),
     material("SW_Leather", save_texture("SW_Leather", tex_leather())),
@@ -212,12 +232,12 @@ MATS = [
     material("SW_Metal", save_texture("SW_Metal", tex_metal())),
     material("SW_Cloth", save_texture("SW_Cloth", tex_cloth())),
     material("SW_Steel", save_texture("SW_Steel", tex_steel())),
-    material("SW_Socket", emission=(0.0, 0.0, 0.0), strength=0.0),
-    material("SW_EyeFire", emission=(0.05, 0.3, 1.0), strength=4.0),
-    flame_material("SW_EyeFlame", save_texture("SW_EyeFlame", flame_rgb, alpha=flame_alpha, raw=True)),
+    material("SW_EyeFire", emission=(0.1, 0.5, 1.0), strength=10.0),
+    flame_material("SW_EyeGlow", save_texture("SW_EyeGlow", glow_rgb, alpha=glow_alpha, raw=True), strength=5.0),
+    material("SW_Skull", save_texture("SW_Skull", tex_skull(), grime=0.22)),
 ]
-BONE, LEATHER, STRAP, METAL, CLOTH, STEEL, SOCKET, EYE, FLAME = range(len(MATS))
-FLAT = {METAL, STEEL, SOCKET, FLAME}   # без сглаживания: металл с гранями, плоские языки огня
+BONE, LEATHER, STRAP, METAL, CLOTH, STEEL, EYE, FLAME, SKULL = range(len(MATS))
+FLAT = {METAL, STEEL, FLAME}   # без сглаживания: металл с гранями, плоский ореол глаз
 
 # ---------------------------------------------------------------- кости рига (голова, хвост) -- T-поза
 L, R = 1, -1
@@ -329,29 +349,6 @@ def ring(center, radius, minor, mat, bone, segs=8, scale=(1, 1, 1), rot=(0, 0, 0
     return verts
 
 
-def shell(center, radius, length, a0, a1, mat, bone, steps=5, thick=0.012, taper=1.0, rot=(0, 0, 0)):
-    """Изогнутая пластина (наплечник): часть трубы вдоль оси X, дуга a0..a1 градусов от +Z к -Y, с толщиной."""
-    rows = []
-    for i in range(steps + 1):
-        a = math.radians(a0 + (a1 - a0) * i / steps)
-        row = []
-        for x, rr in ((-length / 2, radius), (length / 2, radius * taper)):
-            for r in (rr, rr + thick):
-                row.append(bm.verts.new((x, -math.sin(a) * r, math.cos(a) * r)))
-        rows.append(row)          # [x0 внутр., x0 наруж., x1 внутр., x1 наруж.]
-    for a, b in zip(rows, rows[1:]):
-        bm.faces.new((a[1], a[3], b[3], b[1]))
-        bm.faces.new((a[0], b[0], b[2], a[2]))
-        bm.faces.new((a[0], a[1], b[1], b[0]))
-        bm.faces.new((a[2], b[2], b[3], a[3]))
-    for r in (rows[0], rows[-1]):
-        bm.faces.new((r[0], r[2], r[3], r[1]))
-    verts = [v for r in rows for v in r]
-    place(verts, loc=center, rot=rot)
-    finish(verts, mat, bone)
-    return verts
-
-
 def strap(points, width, thick, mat, bone):
     """Плоский ремень по ломаной: по бруску на каждый отрезок, ширина -- по оси X мира."""
     for p1, p2 in zip(points, points[1:]):
@@ -376,39 +373,91 @@ def sole(cx, outline, z0, z1, mat, bone):
     finish(bot + top, mat, bone)
 
 
-def flame(base, width, height, bone, lean=(0, 0.02)):
-    """Язык огня: три вертикальных листа крестом (через 60°) с текстурой пламени во всю площадь."""
-    bx, by, bz = base
-    for k in range(3):
-        a = math.radians(60 * k)
-        dx, dy = math.cos(a) * width / 2, math.sin(a) * width / 2
-        quad = [bm.verts.new((bx - dx, by - dy, bz)), bm.verts.new((bx + dx, by + dy, bz)),
-                bm.verts.new((bx + dx + lean[0], by + dy + lean[1], bz + height)),
-                bm.verts.new((bx - dx + lean[0], by - dy + lean[1], bz + height))]
-        f = bm.faces.new(quad)
-        for loop, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
-            loop[uv_layer].uv = uv
-        finish(quad, FLAME, bone, keep_uv=True)
+def glow_quad(center, w, h, bone):
+    """Плоский ореол глаза лицом вперёд (-Y), UV во всю площадь."""
+    cx, cy, cz = center
+    quad = [bm.verts.new((cx - w / 2, cy, cz - h / 2)), bm.verts.new((cx + w / 2, cy, cz - h / 2)),
+            bm.verts.new((cx + w / 2, cy, cz + h / 2)), bm.verts.new((cx - w / 2, cy, cz + h / 2))]
+    f = bm.faces.new(quad)
+    for loop, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+        loop[uv_layer].uv = uv
+    finish(quad, FLAME, bone, keep_uv=True)
 
 
-# --- голова: округлый череп, скуловые дуги, челюсть подковой с ветвями до височного сустава
-blob((0.1, 0.114, 0.106), BONE, "Head", segs=12, rings=8, loc=(0, 0.008, 1.737))           # свод черепа
-for s in (L, R):
-    rod((0, -0.1, 1.752), (s * 0.085, -0.08, 1.742), 0.016, BONE, "Head", segs=6)          # надбровная дуга
-    rod((s * 0.055, -0.088, 1.688), (s * 0.094, -0.02, 1.7), 0.013, BONE, "Head", segs=6)   # скуловая дуга
-    blob((0.024, 0.026, 0.02), BONE, "Head", segs=6, rings=4, loc=(s * 0.058, -0.08, 1.685))  # скула
-blob((0.056, 0.042, 0.032), BONE, "Head", segs=8, rings=5, loc=(0, -0.08, 1.662))          # верхняя челюсть
-for s in (L, R):
-    blob((0.028, 0.02, 0.027), SOCKET, "Head", segs=8, rings=5, loc=(s * 0.041, -0.099, 1.712))
-    blob(0.012, EYE, "Head", segs=6, rings=4, loc=(s * 0.042, -0.11, 1.708))
-    flame((s * 0.041, -0.112, 1.698), 0.07, 0.13, "Head", lean=(s * 0.01, 0.03))
-rod((0, -0.12, 1.692), (0, -0.112, 1.666), 0.012, SOCKET, "Head", r2=0.004, segs=3)         # носовая дыра
-ring((0, -0.062, 1.638), 0.044, 0.01, BONE, "Head", segs=7, arc=150, scale=(1, 0.85, 1.5))  # верхние зубы
-ring((0, -0.058, 1.603), 0.05, 0.015, BONE, "Jaw", segs=8, arc=200, scale=(1, 0.9, 1.1))    # нижняя челюсть
-ring((0, -0.06, 1.622), 0.043, 0.009, BONE, "Jaw", segs=7, arc=150, scale=(1, 0.85, 1.4))   # нижние зубы
-blob((0.022, 0.016, 0.018), BONE, "Jaw", segs=6, rings=4, loc=(0, -0.106, 1.598))           # подбородок
-for s in (L, R):
-    rod((s * 0.05, -0.032, 1.603), (s * 0.074, -0.012, 1.665), 0.012, BONE, "Jaw", segs=6)  # ветвь до сустава
+HEAD_C = Vector((0, -0.005, 1.708))      # центр головы
+HEAD_R = Vector((0.102, 0.122, 0.122))   # полуоси до лепки
+SOCKETS = [Vector((s * 0.42, -0.86, 0.14)) for s in (L, R)]
+
+
+def influence(d, c, r, squash=(1, 1, 1)):
+    """Вес 0..1 точки единичной сферы d относительно центра c (радиус r, эллипс squash), плавный спад."""
+    diff = Vector(((d.x - c[0]) / squash[0], (d.y - c[1]) / squash[1], (d.z - c[2]) / squash[2]))
+    t = max(0.0, 1.0 - diff.length / r)
+    return t * t * (3 - 2 * t)
+
+
+def sculpt(d):
+    """Лепка черепа из сферы: d -- точка единичной сферы, результат -- точка в долях полуосей головы."""
+    p = d.copy()
+    if d.z < 0:                                     # к челюсти череп сужается, затылок переходит в шею
+        t = -d.z
+        p.x *= 1 - 0.36 * t * t
+        if d.y > 0:
+            p.y *= 1 - 0.3 * t
+    if p.y < -0.55:                                 # лицевая часть плоская
+        p.y = -0.55 + (p.y + 0.55) * 0.55
+    p.y += 0.1 * influence(d, (0, 0.6, 0.3), 0.8)   # затылок вытянут назад
+    p += d.normalized() * 0.1 * influence(d, (0, 0.3, 0.75), 0.75)   # свод черепа шире и выше
+    radial = d.normalized()
+    push = 0.0
+    push += 0.12 * influence(d, (0, -0.95, 0.42), 0.5, squash=(1.7, 1, 0.5))      # надбровья
+    for s in (L, R):
+        push += 0.16 * influence(d, (s * 0.72, -0.6, -0.08), 0.3)                  # скулы
+        push -= 0.12 * influence(d, (s * 0.95, -0.15, 0.2), 0.42)                  # виски
+        push -= 0.12 * influence(d, (s * 0.6, -0.5, -0.5), 0.35)                   # впадины щёк под скулами
+        push -= 0.36 * influence(d, (s * 0.42, -0.86, 0.14), 0.36, squash=(1.1, 1, 0.85))  # глазницы
+    push -= 0.22 * influence(d, (0, -0.96, -0.16), 0.2, squash=(0.8, 1, 1.4))     # носовая полость
+    push += 0.22 * influence(d, (0, -0.95, -0.45), 0.42, squash=(1.2, 1, 0.7))    # верхняя челюсть вперёд
+    push -= 0.05 * influence(d, (0, -0.95, -0.6), 0.25, squash=(2.0, 1, 0.35))    # линия рта
+    push += 0.10 * influence(d, (0, -0.8, -0.9), 0.35)                              # подбородок
+    return p + radial * push
+
+
+def head():
+    """Голова одним куском: сфера 24x16, вылепленная sculpt(); низ лица привязан к кости Jaw.
+    UV -- проекция спереди на текстуру лица SW_Skull."""
+    verts = bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=16, radius=1.0)["verts"]
+    jaw = []
+    for v in verts:
+        d = v.co.normalized()
+        p = sculpt(d)
+        v.co = HEAD_C + Vector((p.x * HEAD_R.x, p.y * HEAD_R.y, p.z * HEAD_R.z))
+        if d.z < -0.5 and d.y < 0.3:
+            jaw.append(v)
+    finish(verts, BONE, "Head")                    # бока и затылок -- обычная кость (кубическая проекция)
+    for f in {f for v in verts for f in v.link_faces}:
+        f.normal_update()
+        if f.normal.y > -0.35:
+            continue
+        f.material_index = SKULL                   # лицо -- текстура лица, проекция спереди
+        for loop in f.loops:
+            c = loop.vert.co - HEAD_C
+            loop[uv_layer].uv = (0.5 + c.x / (2 * HEAD_R.x * 1.05), 0.5 + c.z / (2 * HEAD_R.z * 1.05))
+    head_i, jaw_i = BONE_NAMES.index("Head"), BONE_NAMES.index("Jaw")
+    for v in jaw:
+        del v[deform][head_i]
+        v[deform][jaw_i] = 1.0
+    # глаза: светящиеся миндалины на дне глазниц, не выше поверхности лица; ореол там же
+    for c in SOCKETS:
+        bottom = HEAD_C + Vector([a * r for a, r in zip(sculpt(c.normalized()), HEAD_R)])
+        s = 1 if c.x > 0 else -1
+        blob((0.026, 0.005, 0.01), EYE, "Head", segs=8, rings=4, loc=bottom + Vector((0, -0.008, 0)),
+             rot=(0, s * 16, 0))
+        glow_quad(bottom + Vector((0, -0.012, 0)), 0.1, 0.06, "Head")
+
+
+# --- голова: одна вылепленная сфера с челюстью и глазами в глазницах
+head()
 
 # --- позвоночник, рёбра, грудина, таз
 rod((0, 0, 1.0), (0, 0, 1.5), 0.022, BONE, "Spine", segs=6)
@@ -458,12 +507,12 @@ for s, side in ((L, "L"), (R, "R")):
         ring((s * 0.10, 0, z), 0.05 - (0.38 - z) * 0.03, 0.006, STRAP, f"LowerLeg.{side}", segs=8)
 
     # наплечник: две изогнутые пластины, первая продолжает накидку, вторая лежит на плече
-    shell((s * 0.24, 0.0, 1.43), 0.1, 0.16, -88, 88, LEATHER, f"Shoulder.{side}", steps=8, taper=0.92,
-          rot=(0, s * 22, 0))
-    shell((s * 0.33, 0.0, 1.4), 0.088, 0.11, -82, 82, STRAP, f"UpperArm.{side}", steps=8, taper=0.9,
-          rot=(0, s * 34, 0))
+    blob((0.125, 0.12, 0.08), LEATHER, f"Shoulder.{side}", segs=10, rings=5,
+         loc=(s * 0.19, 0, 1.48), rot=(0, s * 20, 0))                                      # наплечник до ворота
+    blob((0.085, 0.09, 0.05), STRAP, f"UpperArm.{side}", segs=10, rings=5,
+         loc=(s * 0.235, 0, 1.515), rot=(0, s * 25, 0))                                    # второй слой
     for dy in (-0.06, 0.06):
-        blob(0.011, METAL, f"Shoulder.{side}", segs=5, rings=3, loc=(s * 0.235, dy, 1.53))    # заклёпки
+        blob(0.011, METAL, f"Shoulder.{side}", segs=5, rings=3, loc=(s * 0.2, dy, 1.548))   # заклёпки
 
     # подтяжки: спереди по рёбрам до пояса, сзади крест-накрест
     strap([(s * 0.085, -0.07, 1.5), (s * 0.085, -0.13, 1.43), (s * 0.085, -0.15, 1.33),
@@ -711,7 +760,8 @@ if PREVIEW:
     rig.animation_data.action = ACTIONS[0]
     for ang in (0, 35, 90):
         shot(os.path.join(PREVIEW, f"view_{ang}.png"), ang, 1)
-    shot(os.path.join(PREVIEW, "face.png"), 15, 1, dist=0.9, height=1.72, target_z=1.68)
+    shot(os.path.join(PREVIEW, "face.png"), 0, 1, dist=0.75, height=1.72, target_z=1.7)
+    shot(os.path.join(PREVIEW, "face_side.png"), 70, 1, dist=0.75, height=1.72, target_z=1.7)
     for act, frames in ((ACTIONS[1], (1, 7, 13, 19)), (ACTIONS[2], (1, 10, 16, 24)),
                         (ACTIONS[3], (1, 4)), (ACTIONS[4], (1, 10, 20, 36))):
         rig.animation_data.action = act
