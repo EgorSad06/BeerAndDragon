@@ -16,6 +16,9 @@ public class Damageable : MonoBehaviour, IDamageable
     public float Health { get; private set; }
     public bool IsDead => Health <= 0f;
 
+    // Вызывается один раз при смерти (до удаления) -- например, чтобы враг проиграл анимацию смерти
+    public event System.Action Died;
+
     private Renderer[] renderers;
     private MaterialPropertyBlock mpb;
     private float flashTimer;
@@ -69,6 +72,7 @@ public class Damageable : MonoBehaviour, IDamageable
 
     private void Die()
     {
+        Died?.Invoke();
         if (deathEffectPrefab != null)
             Instantiate(deathEffectPrefab, transform.position, Quaternion.identity);
 

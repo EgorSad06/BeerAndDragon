@@ -6,7 +6,8 @@ using UnityEngine.Rendering;
 
 // Настройки импорта моделей врагов из Assets/Game/Assets/enemies (их собирают скрипты tools/blender/*.py):
 //  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo);
-//  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены;
+//  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены; движение корня (наклон и
+//    опускание таза в Death, шаг в Attack) запечено в позу -- враг двигается скриптом, root motion не нужен;
 //  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
 //    если есть Textures/<материал>_Emission.png -- это карта свечения (синие глаза на текстуре скелета);
 //  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у ореола края не повторяются (Clamp).
@@ -38,7 +39,8 @@ public class EnemyModelImporter : AssetPostprocessor
         {
             c.name = c.takeName.Split('|').Last();
             c.loopTime = Looped.Contains(c.name);
-            c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = c.loopTime;
+            c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = true;
+            c.keepOriginalOrientation = c.keepOriginalPositionY = c.keepOriginalPositionXZ = true;
         }
         m.clipAnimations = clips;
     }
