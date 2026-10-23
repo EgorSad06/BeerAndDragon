@@ -5,9 +5,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 // Настройки импорта моделей врагов из Assets/Game/Assets/enemies (их собирают скрипты tools/blender/*.py):
-//  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo);
+//  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo); у моделей из GenericModels -- Generic:
+//    Humanoid не импортирует анимацию дополнительных костей, а у лучника это тетива и стрела;
 //  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены; движение корня (наклон и
 //    опускание таза в Death, шаг в Attack) запечено в позу -- враг двигается скриптом, root motion не нужен;
+//  - в Shoot (лучник) -- событие OnArrowRelease на кадре, где отпущена тетива (SkeletonCreep.ArrowReleased);
 //  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
 //    если есть Textures/<материал>_Emission.png -- это карта свечения (синие глаза на текстуре скелета);
 //  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у ореола края не повторяются (Clamp).
@@ -15,6 +17,8 @@ public class EnemyModelImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Assets/enemies/";
     private static readonly string[] Looped = { "Idle", "Walk" };
+    private static readonly string[] GenericModels = { "SkeletonArcher" };
+    private const float ShootReleaseFrame = 2f;   // от начала клипа Shoot (tools/blender/skeleton_archer.py)
 
     private bool IsEnemyAsset => assetPath.Replace('\\', '/').StartsWith(Folder);
 
@@ -22,7 +26,8 @@ public class EnemyModelImporter : AssetPostprocessor
     {
         if (!IsEnemyAsset) return;
         ModelImporter m = (ModelImporter)assetImporter;
-        m.animationType = ModelImporterAnimationType.Human;
+        bool generic = GenericModels.Contains(Path.GetFileNameWithoutExtension(assetPath));
+        m.animationType = generic ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.Human;
         m.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
         m.importAnimation = true;
         m.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
@@ -41,6 +46,12 @@ public class EnemyModelImporter : AssetPostprocessor
             c.loopTime = Looped.Contains(c.name);
             c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = true;
             c.keepOriginalOrientation = c.keepOriginalPositionY = c.keepOriginalPositionXZ = true;
+            if (c.name == "Shoot")
+                c.events = new[] { new AnimationEvent
+                {
+                    functionName = "OnArrowRelease",
+                    time = ShootReleaseFrame / (c.lastFrame - c.firstFrame),
+                } };
         }
         m.clipAnimations = clips;
     }

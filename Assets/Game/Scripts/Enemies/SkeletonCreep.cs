@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Скелет-крип: модель Assets/Game/Assets/enemies/Skeleton (её собирает tools/blender/skeleton_psx.py).
+// Скелет-крип и скелет-лучник: модели Assets/Game/Assets/enemies/Skeleton и SkeletonArcher
+// (их собирают tools/blender/skeleton_psx.py и skeleton_archer.py).
 //  - оружие: в модели на кости WeaponSocket.R лежат все одноручные из пака (Weapon_Arming_Sword, Weapon_Hatchet...),
 //    включается одно -- заданное в weapon или случайное;
-//  - анимации через Animator (контроллер Skeleton.controller): Speed -- ходьба, Attack -- удар, Die -- смерть;
+//  - анимации через Animator (контроллер <модель>.controller): Speed -- ходьба, Attack -- удар (у лучника --
+//    натянуть и выстрелить; в момент выстрела -- событие ArrowReleased), Die -- смерть;
 //  - смерть по Damageable: проигрывается анимация, коллайдеры выключаются, тело удаляет Damageable (destroyDelay).
 [RequireComponent(typeof(Animator))]
 public class SkeletonCreep : MonoBehaviour
@@ -22,6 +24,9 @@ public class SkeletonCreep : MonoBehaviour
     private Animator animator;
     private Damageable health;
     private readonly List<GameObject> weapons = new List<GameObject>();
+
+    // Лучник отпустил тетиву (событие анимации Shoot) -- здесь появится летящая стрела
+    public event System.Action ArrowReleased;
 
     public string CurrentWeapon { get; private set; }
     public bool IsDead { get; private set; }
@@ -67,6 +72,12 @@ public class SkeletonCreep : MonoBehaviour
     public void Attack()
     {
         if (!IsDead) animator.SetTrigger(AttackId);
+    }
+
+    // Вызывается событием анимации Shoot
+    private void OnArrowRelease()
+    {
+        ArrowReleased?.Invoke();
     }
 
     private void OnDied()
