@@ -52,6 +52,22 @@ PrefabInstance:
       propertyPath: m_Name
       value: SkeletonShield
       objectReference: {fileID: 0}
+    - target: {fileID: 2771009532685076077, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.55158716
+      objectReference: {fileID: 0}
+    - target: {fileID: 2771009532685076077, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.04919244
+      objectReference: {fileID: 0}
+    - target: {fileID: 2771009532685076077, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.64864385
+      objectReference: {fileID: 0}
+    - target: {fileID: 2771009532685076077, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.5221043
+      objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
       propertyPath: m_Controller
       value: 
@@ -62,11 +78,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6666910509117134809, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0.025926892
+      value: 0.025926894
       objectReference: {fileID: 0}
     - target: {fileID: 6666910509117134809, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0.008988467
+      value: -0.008988468
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -159,6 +175,11 @@ MonoBehaviour:
   shieldPaint: -1
   blockedDamage: 0.2
   parryTime: 0.35
+  attackClips:
+  - shield_attack1
+  - shield_attack2
+  hitClip: shield_hit
+  deathVariants: 1
 --- !u!114 &6959334845492160285
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -175,7 +196,10 @@ MonoBehaviour:
   sightRange: 16
   loseRange: 26
   eyeHeight: 1.6
-  walkSpeed: 1
+  walkSpeed: 1.5
+  runSpeed: 4.1
+  runDistance: 9
+  strafeSpeed: 1.09
   turnSpeed: 300
   personalSpace: 0.9
   attackRange: 1.6
@@ -183,6 +207,8 @@ MonoBehaviour:
   hitAngle: 70
   damage: 12
   attackCooldown: 1
+  hitReactCooldown: 1.2
+  fidgetEvery: {x: 7, y: 14}
   threatRange: 3.5
   parryChance: 0.35
   blockOnHitChance: 0.5

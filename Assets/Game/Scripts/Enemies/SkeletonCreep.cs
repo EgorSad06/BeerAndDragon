@@ -5,9 +5,11 @@ using UnityEngine;
 // (их собирают tools/blender/skeleton_psx.py, skeleton_archer.py, skeleton_shield.py).
 //  - оружие: в модели на кости WeaponSocket.R лежат все одноручные из пака (Weapon_Arming_Sword, Weapon_Hatchet...),
 //    включается одно -- заданное в weapon или случайное;
-//  - анимации через Animator (контроллер <модель>.controller): Speed -- ходьба, Attack -- удар (у лучника --
-//    натянуть и выстрелить; в момент выстрела -- событие ArrowReleased), Die -- смерть;
-//  - щит (у щитовика -- объект Shield): раскраска из shieldPaints (заданная или случайная); SetBlocking -- поднять щит
+//  - анимации через Animator (контроллер <модель>.controller, анимации Mixamo): Speed/Strafe -- движение вперёд
+//    и вбок (м/с, смешиваются стойка, ходьба, бег, шаги вбок), Attack -- случайная из attackClips (у лучника --
+//    достать стрелу, натянуть, выстрелить; в момент выстрела -- событие ArrowReleased), Hit -- вздрогнуть от удара,
+//    Fidget -- «почесаться» в покое, Die -- случайная смерть из deathVariants;
+//  - щит (у щитовика -- меш ShieldMesh): раскраска из shieldPaints (заданная или случайная); SetBlocking -- поднять щит
 //    (проходит blockedDamage урона, удар по щиту -- анимация BlockHit), Parry -- отбив (parryTime с начала урон 0);
 //  - события анимаций: AttackHit (удар достал), ArrowReleased (стрела выпущена) -- их слушает SkeletonAI;
 //  - смерть по Damageable: проигрывается анимация, коллайдеры выключаются, тело удаляет Damageable (destroyDelay).
@@ -28,7 +30,19 @@ public class SkeletonCreep : MonoBehaviour
     [Range(0f, 1f)] public float blockedDamage = 0.2f;
     public float parryTime = 0.35f;
 
+    [Header("Анимации (заполняет SkeletonCreepBuilder)")]
+    [Tooltip("Клипы атак; цепочка клипов -- через +")]
+    public string[] attackClips = new string[0];
+    public string hitClip = "";
+    public int deathVariants = 1;
+
     private static readonly int SpeedId = Animator.StringToHash("Speed");
+    private static readonly int StrafeId = Animator.StringToHash("Strafe");
+    private static readonly int AttackIndexId = Animator.StringToHash("AttackIndex");
+    private static readonly int DeathIndexId = Animator.StringToHash("DeathIndex");
+    private static readonly int HitId = Animator.StringToHash("Hit");
+    private static readonly int FidgetId = Animator.StringToHash("Fidget");
+    private static readonly int DeadId = Animator.StringToHash("Dead");
     private static readonly int AttackId = Animator.StringToHash("Attack");
     private static readonly int DieId = Animator.StringToHash("Die");
     private static readonly int BlockingId = Animator.StringToHash("Blocking");
@@ -71,8 +85,8 @@ public class SkeletonCreep : MonoBehaviour
             foreach (Transform child in socket)
                 if (child.name.StartsWith(WeaponPrefix)) weapons.Add(child.gameObject);
         SetWeapon(weapon);
-        foreach (Renderer r in GetComponentsInChildren<Renderer>(true))   // меш Shield (есть и кость Shield)
-            if (r.name == "Shield") shield = r;
+        foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+            if (r.name == "ShieldMesh") shield = r;
         SetShieldPaint(shieldPaint);
     }
 
@@ -132,32 +146,59 @@ public class SkeletonCreep : MonoBehaviour
         CurrentWeapon = chosen.name.Substring(WeaponPrefix.Length);
     }
 
-    // Скорость движения в м/с: больше 0.1 -- анимация ходьбы
-    public void SetSpeed(float metersPerSecond)
+    // Движение в м/с относительно взгляда: вперёд (назад -- меньше 0) и вбок (вправо -- больше 0)
+    public void SetMove(float forward, float strafe)
     {
-        if (!IsDead) animator.SetFloat(SpeedId, metersPerSecond);
+        if (IsDead) return;
+        animator.SetFloat(SpeedId, forward, 0.1f, Time.deltaTime);
+        animator.SetFloat(StrafeId, strafe, 0.1f, Time.deltaTime);
     }
 
-    public void Attack()
+    // Случайная атака; ответ -- сколько она займёт (с)
+    public float Attack()
     {
-        if (!IsDead) animator.SetTrigger(AttackId);
+        if (IsDead || attackClips.Length == 0) return 0f;
+        int i = Random.Range(0, attackClips.Length);
+        animator.SetInteger(AttackIndexId, i);
+        animator.SetTrigger(AttackId);
+        return ClipLength(attackClips[i]);
     }
 
-    // Длина клипа контроллера (сколько займёт атака), 0 -- нет такого
-    public float ClipLength(string clipName)
+    // Вздрогнуть от удара; ответ -- сколько займёт (с)
+    public float Hit()
     {
-        foreach (AnimationClip c in animator.runtimeAnimatorController.animationClips)
-            if (c.name == clipName) return c.length;
-        return 0f;
+        if (IsDead || hitClip.Length == 0) return 0f;
+        animator.SetTrigger(HitId);
+        return ClipLength(hitClip);
     }
 
-    // Вызывается событием анимации Shoot
+    // Переминание в покое (у крипа -- почесаться)
+    public void Fidget()
+    {
+        if (!IsDead) animator.SetTrigger(FidgetId);
+    }
+
+    // Длина клипа контроллера; «a+b+c» -- сумма; 0 -- нет такого
+    public float ClipLength(string clipNames)
+    {
+        float total = 0f;
+        foreach (string name in clipNames.Split('+'))
+            foreach (AnimationClip c in animator.runtimeAnimatorController.animationClips)
+                if (c.name == name)
+                {
+                    total += c.length;
+                    break;
+                }
+        return total;
+    }
+
+    // Вызывается событием анимации выстрела (archer_shoot)
     private void OnArrowRelease()
     {
         ArrowReleased?.Invoke();
     }
 
-    // Вызывается событием анимации Attack
+    // Вызывается событием анимации удара
     private void OnAttackHit()
     {
         if (!IsDead) AttackHit?.Invoke();
@@ -169,7 +210,10 @@ public class SkeletonCreep : MonoBehaviour
         IsBlocking = false;
         if (health != null) health.damageMultiplier = 1f;
         animator.SetFloat(SpeedId, 0f);
+        animator.SetFloat(StrafeId, 0f);
         if (HasShield) animator.SetBool(BlockingId, false);
+        animator.SetBool(DeadId, true);
+        animator.SetInteger(DeathIndexId, Random.Range(0, deathVariants));
         animator.SetTrigger(DieId);
         foreach (Collider c in GetComponentsInChildren<Collider>()) c.enabled = false;
     }

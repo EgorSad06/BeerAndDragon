@@ -1,37 +1,68 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 
-// Собирает готовых врагов-скелетов из моделей tools/blender/skeleton_psx.py, skeleton_archer.py, skeleton_shield.py:
-//  - <модель>.controller: Idle <-> Walk по Speed; по триггеру Attack (из Idle и Walk) -- цепочка атаки
-//    (крип и щитовик: Attack; лучник: Draw -> Shoot), потом Idle; Death по триггеру Die отовсюду;
-//    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту в блоке), Parry (из Idle, Walk, Block);
-//  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonAI (своя роль);
-//  - у лучника -- префаб летящей стрелы SkeletonArrow.prefab (модель Arrow.fbx) в SkeletonAI.arrowPrefab;
-//  - у щитовика -- материалы раскрасок SKS_Paint1..8 (копии SKS_Paint1 со своей текстурой) в SkeletonCreep.shieldPaints.
+// Собирает готовых врагов-скелетов из моделей tools/blender/skeleton_psx.py, skeleton_archer.py, skeleton_shield.py
+// и анимаций Mixamo (Animations/Mixamo, см. MixamoClipImporter):
+//  - <модель>.controller: Move -- смешивание по скорости вперёд (Speed) и вбок (Strafe): стойка, ходьба, бег,
+//    шаги вбок; по триггеру Attack -- атака номер AttackIndex (у лучника цепочка: достать стрелу, натянуть,
+//    выстрелить; состояния с тегом Attack); Hit -- вздрогнуть; Fidget -- почесаться; Die -- смерть DeathIndex;
+//    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту), Parry (свой клип из SkeletonShield.fbx);
+//  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonAI (роль, скорости
+//    шагов из анимаций); лучнику -- BowRig (тетива, стрела) и SkeletonArrow.prefab; щитовику -- раскраски щита;
+//  - лук и щит поворачиваются в руке так, чтобы в позах Mixamo лук стоял вертикально тетивой к правой руке
+//    (прицел), а щит -- лицом вперёд (стойка, ходьба, блок -- в среднем); кости-метки BowTop/BowString,
+//    ShieldTop/ShieldFront.
 // Запуск: меню Tools/BeerAndDragon/Build Skeleton Enemies (или -executeMethod SkeletonCreepBuilder.Build).
 public static class SkeletonCreepBuilder
 {
     private const string Root = "Assets/Game/Assets/enemies/";
 
-    private struct Variant
+    private class Variant
     {
         public string Folder, Model, Prefab;
-        public string[] AttackChain;
         public float Health;
-        public bool Shield;
         public SkeletonAI.Role Role;
+        public (string clip, float strafe, float forward)[] Move;   // скорости -- шаг в анимации, м/с
+        public float Walk, Run, RunDistance, Strafe;
+        public string[] Attacks;            // цепочка клипов -- через +
+        public string Hit, Fidget;
+        public string[] Deaths;
+        public bool Shield;
     }
 
     private static readonly Variant[] Variants =
     {
-        new Variant { Folder = "Skeleton", Model = "Skeleton", Prefab = "SkeletonCreep",
-                      AttackChain = new[] { "Attack" }, Health = 60f, Role = SkeletonAI.Role.Melee },
-        new Variant { Folder = "SkeletonArcher", Model = "SkeletonArcher", Prefab = "SkeletonArcher",
-                      AttackChain = new[] { "Draw", "Shoot" }, Health = 40f, Role = SkeletonAI.Role.Archer },
-        new Variant { Folder = "SkeletonShield", Model = "SkeletonShield", Prefab = "SkeletonShield",
-                      AttackChain = new[] { "Attack" }, Health = 80f, Shield = true, Role = SkeletonAI.Role.Shield },
+        new Variant
+        {
+            Folder = "Skeleton", Model = "Skeleton", Prefab = "SkeletonCreep", Health = 60f, Role = SkeletonAI.Role.Melee,
+            Move = new[] { ("creep_idle", 0f, 0f), ("creep_walk", 0f, 0.45f), ("creep_run", 0f, 3.1f) },
+            Walk = 0.45f, Run = 3.1f, RunDistance = 4f,
+            Attacks = new[] { "creep_attack1", "creep_attack2", "creep_attack3" },
+            Hit = "creep_hit", Fidget = "creep_idle2", Deaths = new[] { "creep_death1", "creep_death2" },
+        },
+        new Variant
+        {
+            Folder = "SkeletonArcher", Model = "SkeletonArcher", Prefab = "SkeletonArcher", Health = 40f,
+            Role = SkeletonAI.Role.Archer,
+            Move = new[] { ("archer_idle", 0f, 0f), ("archer_walk", 0f, 1.02f),
+                           ("archer_strafe_left", -1.35f, 0f), ("archer_strafe_right", 1.39f, 0f) },
+            Walk = 1.02f, Strafe = 1.35f,
+            Attacks = new[] { "archer_draw+archer_aim+archer_shoot" },
+            Hit = "archer_hit", Deaths = new[] { "archer_death" },
+        },
+        new Variant
+        {
+            Folder = "SkeletonShield", Model = "SkeletonShield", Prefab = "SkeletonShield", Health = 80f,
+            Role = SkeletonAI.Role.Shield, Shield = true,
+            Move = new[] { ("shield_idle", 0f, 0f), ("shield_walk", 0f, 1.5f), ("shield_run", 0f, 4.1f),
+                           ("shield_strafe_left", -1.09f, 0f), ("shield_strafe_right", 1.09f, 0f) },
+            Walk = 1.5f, Run = 4.1f, RunDistance = 9f, Strafe = 1.09f,
+            Attacks = new[] { "shield_attack1", "shield_attack2" },
+            Hit = "shield_hit", Deaths = new[] { "shield_death" },
+        },
     };
 
     [MenuItem("Tools/BeerAndDragon/Build Skeleton Enemies")]
@@ -46,7 +77,8 @@ public static class SkeletonCreepBuilder
         string dir = Root + v.Folder;
         string modelPath = $"{dir}/{v.Model}.fbx";
         string prefabPath = $"{dir}/{v.Prefab}.prefab";
-        AnimatorController controller = BuildController($"{dir}/{v.Model}.controller", modelPath, v.AttackChain, v.Shield);
+        var clips = new ClipFinder(modelPath);
+        AnimatorController controller = BuildController($"{dir}/{v.Model}.controller", v, clips);
         GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
         GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(model);
         go.name = v.Prefab;
@@ -68,17 +100,93 @@ public static class SkeletonCreepBuilder
         health.destroyDelay = 6f;   // тело лежит, потом исчезает
 
         SkeletonCreep creep = go.AddComponent<SkeletonCreep>();
-        if (v.Shield) creep.shieldPaints = BuildShieldPaints(dir);
+        creep.attackClips = v.Attacks;
+        creep.hitClip = v.Hit;
+        creep.deathVariants = v.Deaths.Length;
+        if (v.Shield)
+        {
+            creep.shieldPaints = BuildShieldPaints(dir);
+            AlignToClips(go, new[] { (clips["shield_idle"], 0.5f), (clips["shield_walk"], 0.3f), (clips["shield_block_idle"], 0.3f) },
+                         "Shield", "ShieldTop", "ShieldFront", g => g.transform.forward);
+        }
 
         SkeletonAI ai = go.AddComponent<SkeletonAI>();
         ai.role = v.Role;
-        if (v.Role == SkeletonAI.Role.Shield) ai.walkSpeed = 1.0f;
-        if (v.Role == SkeletonAI.Role.Archer) ai.arrowPrefab = BuildArrowPrefab(dir);
+        ai.walkSpeed = v.Walk;
+        ai.runSpeed = v.Run;
+        ai.runDistance = v.RunDistance;
+        ai.strafeSpeed = v.Strafe;
+        if (v.Role == SkeletonAI.Role.Archer)
+        {
+            ai.arrowPrefab = BuildArrowPrefab(dir);
+            go.AddComponent<BowRig>();
+            AlignToClips(go, new[] { (clips["archer_aim"], 0.5f) }, "Bow", "BowTop", "BowString",
+                         g => Find(g, "Hand.R").position - Find(g, "Bow").position);
+        }
 
         PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
         Object.DestroyImmediate(go);
         Debug.Log($"[SkeletonCreep] {prefabPath}");
     }
+
+    // Клипы по имени: сначала из модели (свои, например Parry), потом из Animations/Mixamo/<имя>.fbx
+    private class ClipFinder
+    {
+        private readonly Dictionary<string, AnimationClip> clips = new Dictionary<string, AnimationClip>();
+
+        public ClipFinder(string modelPath)
+        {
+            var files = AssetDatabase.FindAssets("t:Model", new[] { MixamoClipImporter.Folder.TrimEnd('/') })
+                .Select(AssetDatabase.GUIDToAssetPath).Append(modelPath);
+            foreach (string path in files)
+                foreach (AnimationClip c in AssetDatabase.LoadAllAssetsAtPath(path).OfType<AnimationClip>())
+                    if (!c.name.StartsWith("__preview__")) clips[c.name] = c;
+        }
+
+        public AnimationClip this[string name] =>
+            clips.TryGetValue(name, out AnimationClip c) ? c : throw new KeyNotFoundException("Нет клипа " + name);
+    }
+
+    // Повернуть кость (лук, щит) в руке: в позах клипов (клип, момент) метка up смотрит вверх, а метка front -- по
+    // направлению wantFront. Поворот для каждой позы свой -- берётся средний. Поза модели потом возвращается как была.
+    private static void AlignToClips(GameObject go, (AnimationClip clip, float time)[] poses, string bone, string upMark,
+                                     string frontMark, System.Func<GameObject, Vector3> wantFront)
+    {
+        Transform[] all = go.GetComponentsInChildren<Transform>(true);
+        var saved = all.ToDictionary(t => t, t => (t.localPosition, t.localRotation, t.localScale));
+        Transform b = Find(go, bone);
+        Vector4 sum = Vector4.zero;
+        Quaternion first = Quaternion.identity;
+        foreach (var (clip, time) in poses)
+        {
+            Restore(saved);
+            clip.SampleAnimation(go, time);
+            Vector3 curUp = (Find(go, upMark).position - b.position).normalized;
+            Vector3 curFront = Vector3.ProjectOnPlane(Find(go, frontMark).position - b.position, curUp).normalized;
+            Vector3 front = Vector3.ProjectOnPlane(wantFront(go), Vector3.up).normalized;
+            Quaternion fix = Quaternion.LookRotation(front, Vector3.up) * Quaternion.Inverse(Quaternion.LookRotation(curFront, curUp));
+            Quaternion local = Quaternion.Inverse(b.parent.rotation) * fix * b.rotation;   // нужный поворот в руке
+            if (sum == Vector4.zero) first = local;
+            float sign = Quaternion.Dot(first, local) < 0f ? -1f : 1f;
+            sum += new Vector4(local.x, local.y, local.z, local.w) * sign;
+        }
+        sum.Normalize();
+        Restore(saved);
+        b.localRotation = new Quaternion(sum.x, sum.y, sum.z, sum.w);
+    }
+
+    private static void Restore(Dictionary<Transform, (Vector3 localPosition, Quaternion localRotation, Vector3 localScale)> saved)
+    {
+        foreach (var kv in saved)
+        {
+            kv.Key.localPosition = kv.Value.localPosition;
+            kv.Key.localRotation = kv.Value.localRotation;
+            kv.Key.localScale = kv.Value.localScale;
+        }
+    }
+
+    private static Transform Find(GameObject go, string name) =>
+        go.GetComponentsInChildren<Transform>(true).First(t => t.name == name);
 
     private static SkeletonArrow BuildArrowPrefab(string dir)
     {
@@ -118,7 +226,7 @@ public static class SkeletonCreepBuilder
     private static Material[] BuildShieldPaints(string dir)
     {
         Material first = AssetDatabase.LoadAssetAtPath<Material>($"{dir}/Materials/SKS_Paint1.mat");
-        var paints = new System.Collections.Generic.List<Material> { first };
+        var paints = new List<Material> { first };
         for (int i = 2; ; i++)
         {
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/Textures/SKS_Paint{i}.png");
@@ -139,92 +247,103 @@ public static class SkeletonCreepBuilder
         return paints.ToArray();
     }
 
-    private static AnimatorController BuildController(string path, string modelPath, string[] attackChain, bool shield)
+    // ---------------------------------------------------------------- контроллер
+    private static AnimatorController BuildController(string path, Variant v, ClipFinder clips)
     {
         AssetDatabase.DeleteAsset(path);
         AnimatorController c = AnimatorController.CreateAnimatorControllerAtPath(path);
-        c.AddParameter("Speed", AnimatorControllerParameterType.Float);
-        c.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
-        c.AddParameter("Die", AnimatorControllerParameterType.Trigger);
-
-        AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<AnimationClip>()
-            .Where(a => !a.name.StartsWith("__preview__")).ToArray();
-        AnimationClip Clip(string name) => clips.First(a => a.name == name);
-
+        foreach (string f in new[] { "Speed", "Strafe" }) c.AddParameter(f, AnimatorControllerParameterType.Float);
+        foreach (string t in new[] { "Attack", "Hit", "Fidget", "Die" }) c.AddParameter(t, AnimatorControllerParameterType.Trigger);
+        foreach (string i in new[] { "AttackIndex", "DeathIndex" }) c.AddParameter(i, AnimatorControllerParameterType.Int);
+        c.AddParameter("Dead", AnimatorControllerParameterType.Bool);
         AnimatorStateMachine sm = c.layers[0].stateMachine;
-        AnimatorState idle = sm.AddState("Idle", new Vector3(300, 0));
-        AnimatorState walk = sm.AddState("Walk", new Vector3(300, 120));
-        AnimatorState death = sm.AddState("Death", new Vector3(550, 260));
-        idle.motion = Clip("Idle");
-        walk.motion = Clip("Walk");
-        death.motion = Clip("Death");
-        sm.defaultState = idle;
 
-        AnimatorStateTransition t = idle.AddTransition(walk);
-        Instant(t, 0.15f).AddCondition(AnimatorConditionMode.Greater, 0.1f, "Speed");
-        t = walk.AddTransition(idle);
-        Instant(t, 0.15f).AddCondition(AnimatorConditionMode.Less, 0.1f, "Speed");
-
-        // цепочка атаки: первый клип по триггеру, следующие -- когда доиграл предыдущий, в конце -- Idle
-        AnimatorState prev = null;
-        for (int i = 0; i < attackChain.Length; i++)
+        // движение: точки смешивания -- (вбок, вперёд) в м/с, как шаг в анимации
+        var tree = new BlendTree
         {
-            AnimatorState s = sm.AddState(attackChain[i], new Vector3(550 + 200 * i, 60));
-            s.motion = Clip(attackChain[i]);
-            if (prev == null)
+            name = "Move",
+            blendType = BlendTreeType.FreeformCartesian2D,
+            blendParameter = "Strafe",
+            blendParameterY = "Speed",
+            useAutomaticThresholds = false,
+            hideFlags = HideFlags.HideInHierarchy,
+        };
+        AssetDatabase.AddObjectToAsset(tree, c);
+        foreach (var (clip, strafe, forward) in v.Move) tree.AddChild(clips[clip], new Vector2(strafe, forward));
+        AnimatorState move = sm.AddState("Move", new Vector3(300, 0));
+        move.motion = tree;
+        sm.defaultState = move;
+
+        for (int i = 0; i < v.Attacks.Length; i++)
+        {
+            AnimatorState prev = null;
+            string[] chain = v.Attacks[i].Split('+');
+            for (int k = 0; k < chain.Length; k++)
             {
-                foreach (AnimatorState from in new[] { idle, walk })
-                    Instant(from.AddTransition(s), 0.08f).AddCondition(AnimatorConditionMode.If, 0, "Attack");
+                AnimatorState s = sm.AddState(chain[k], new Vector3(600 + 220 * k, -120 + 70 * i));
+                s.motion = clips[chain[k]];
+                s.tag = "Attack";
+                if (prev == null)
+                {
+                    AnimatorStateTransition t = Instant(move.AddTransition(s), 0.1f);
+                    t.AddCondition(AnimatorConditionMode.If, 0, "Attack");
+                    t.AddCondition(AnimatorConditionMode.Equals, i, "AttackIndex");
+                }
+                else Then(prev, s, 1f, 0.08f);
+                prev = s;
             }
-            else
-            {
-                t = prev.AddTransition(s);
-                t.hasExitTime = true;
-                t.exitTime = 1f;
-                t.duration = 0f;
-            }
-            prev = s;
+            Then(prev, move, 0.9f, 0.15f);
         }
-        t = prev.AddTransition(idle);
-        t.hasExitTime = true;
-        t.exitTime = 0.95f;
-        t.duration = 0.1f;
 
-        if (shield) AddShieldStates(c, sm, idle, walk, Clip);
+        AnimatorState hit = sm.AddState("Hit", new Vector3(300, 200));
+        hit.motion = clips[v.Hit];
+        AnimatorStateTransition h = Instant(sm.AddAnyStateTransition(hit), 0.05f);
+        h.canTransitionToSelf = false;
+        h.AddCondition(AnimatorConditionMode.If, 0, "Hit");
+        h.AddCondition(AnimatorConditionMode.IfNot, 0, "Dead");
+        Then(hit, move, 0.85f, 0.15f);
 
-        t = sm.AddAnyStateTransition(death);
-        t.canTransitionToSelf = false;
-        Instant(t, 0.1f).AddCondition(AnimatorConditionMode.If, 0, "Die");
+        if (v.Fidget != null)
+        {
+            AnimatorState fidget = sm.AddState("Fidget", new Vector3(50, -120));
+            fidget.motion = clips[v.Fidget];
+            Instant(move.AddTransition(fidget), 0.25f).AddCondition(AnimatorConditionMode.If, 0, "Fidget");
+            Then(fidget, move, 0.9f, 0.25f);
+        }
+
+        for (int i = 0; i < v.Deaths.Length; i++)
+        {
+            AnimatorState death = sm.AddState("Death" + (i + 1), new Vector3(600, 260 + 70 * i));
+            death.motion = clips[v.Deaths[i]];
+            AnimatorStateTransition t = Instant(sm.AddAnyStateTransition(death), 0.1f);
+            t.canTransitionToSelf = false;
+            t.AddCondition(AnimatorConditionMode.If, 0, "Die");
+            t.AddCondition(AnimatorConditionMode.Equals, i, "DeathIndex");
+        }
+
+        if (v.Shield) AddShieldStates(c, sm, move, clips);
         return c;
     }
 
-    private static void AddShieldStates(AnimatorController c, AnimatorStateMachine sm, AnimatorState idle,
-                                        AnimatorState walk, System.Func<string, AnimationClip> clip)
+    private static void AddShieldStates(AnimatorController c, AnimatorStateMachine sm, AnimatorState move, ClipFinder clips)
     {
         c.AddParameter("Blocking", AnimatorControllerParameterType.Bool);
         c.AddParameter("Parry", AnimatorControllerParameterType.Trigger);
         c.AddParameter("BlockHit", AnimatorControllerParameterType.Trigger);
         AnimatorState block = sm.AddState("Block", new Vector3(50, 60));
         AnimatorState hit = sm.AddState("BlockHit", new Vector3(-200, 60));
-        AnimatorState parry = sm.AddState("Parry", new Vector3(50, 220));
-        block.motion = clip("Block");
-        hit.motion = clip("BlockHit");
-        parry.motion = clip("Parry");
+        AnimatorState parry = sm.AddState("Parry", new Vector3(50, 200));
+        block.motion = clips["shield_block_idle"];
+        hit.motion = clips["shield_block_hit"];
+        parry.motion = clips["Parry"];
 
-        foreach (AnimatorState from in new[] { idle, walk })
-            Instant(from.AddTransition(block), 0.12f).AddCondition(AnimatorConditionMode.If, 0, "Blocking");
-        Instant(block.AddTransition(idle), 0.15f).AddCondition(AnimatorConditionMode.IfNot, 0, "Blocking");
+        Instant(move.AddTransition(block), 0.12f).AddCondition(AnimatorConditionMode.If, 0, "Blocking");
+        Instant(block.AddTransition(move), 0.15f).AddCondition(AnimatorConditionMode.IfNot, 0, "Blocking");
         Instant(block.AddTransition(hit), 0.03f).AddCondition(AnimatorConditionMode.If, 0, "BlockHit");
-        AnimatorStateTransition t = hit.AddTransition(block);
-        t.hasExitTime = true;
-        t.exitTime = 0.9f;
-        t.duration = 0.1f;
-        foreach (AnimatorState from in new[] { idle, walk, block })
+        Then(hit, block, 0.9f, 0.1f);
+        foreach (AnimatorState from in new[] { move, block })
             Instant(from.AddTransition(parry), 0.05f).AddCondition(AnimatorConditionMode.If, 0, "Parry");
-        t = parry.AddTransition(idle);
-        t.hasExitTime = true;
-        t.exitTime = 0.95f;
-        t.duration = 0.1f;
+        Then(parry, move, 0.95f, 0.1f);
     }
 
     private static AnimatorStateTransition Instant(AnimatorStateTransition t, float blend)
@@ -232,5 +351,14 @@ public static class SkeletonCreepBuilder
         t.hasExitTime = false;
         t.duration = blend;
         return t;
+    }
+
+    // Переход, когда клип from доиграл до exitTime
+    private static void Then(AnimatorState from, AnimatorState to, float exitTime, float blend)
+    {
+        AnimatorStateTransition t = from.AddTransition(to);
+        t.hasExitTime = true;
+        t.exitTime = exitTime;
+        t.duration = blend;
     }
 }

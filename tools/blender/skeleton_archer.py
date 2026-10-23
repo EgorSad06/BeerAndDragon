@@ -281,7 +281,7 @@ for isl in parts["quiver_arrows"]:
     lo, hi = box(isl)
     quiver_chunks.append((isl, arrow_mat(Vector((0, hi.y, 0)), Vector((0, lo.y, 0)))))
 quiver_chunks += [(isl, lambda c: "feather") for isl in parts["quiver_fletch"]]
-quiver = build_mesh("Quiver", quiver_chunks, quiver_place, ratio=0.15)
+quiver = build_mesh("QuiverMesh", quiver_chunks, quiver_place, ratio=0.15)
 
 # ---------------------------------------------------------------- лук: место в кулаке задаётся позой прицеливания
 W_aim, P_aim, _ = pose.solve(spec_aim(1.0))
@@ -302,7 +302,7 @@ def bow_place(p):
 
 
 bow_chunks = [(isl, lambda c: "wood") for isl in parts["bow"]] + [(isl, lambda c: "grip") for isl in parts["grip"]]
-bow = build_mesh("Bow", bow_chunks, bow_place, ratio=0.22)
+bow = build_mesh("BowMesh", bow_chunks, bow_place, ratio=0.22)
 FIST_REST = L_FIST
 STRING_REST = bow_place(nock_m)
 TIP_A, TIP_B = bow_place(tip_a), bow_place(tip_b)
@@ -321,7 +321,7 @@ for r0, r1 in zip(rings, rings[1:]):
     for k in range(3):
         f = bm.faces.new((r0[k], r0[(k + 1) % 3], r1[(k + 1) % 3], r1[k]))
         f.material_index = MAT_ORDER.index("string")
-string_me = bpy.data.meshes.new("BowString")
+string_me = bpy.data.meshes.new("BowStringMesh")
 bm.to_mesh(string_me)
 bm.free()
 
@@ -340,12 +340,13 @@ def arrow_place(p):
 
 
 arrow_chunks = [(a_isl, arrow_mat(a_nock_m, a_tip_m))] + [(isl, lambda c: "feather") for isl in parts["arrow_fletch"]]
-arrow = build_mesh("Arrow", arrow_chunks, arrow_place, ratio=0.4)
+arrow = build_mesh("ArrowMesh", arrow_chunks, arrow_place, ratio=0.4)
 # летящая стрела для игры -- отдельная модель Arrow.fbx: хвост в начале координат, наконечник по -Y (в Unity -- +Z)
 projectile = build_mesh("ArrowProjectile", arrow_chunks, lambda p: a_rot @ ((p - a_nock_m) * a_scale), ratio=0.4)
 bpy.data.objects.remove(src)
 
 # ---------------------------------------------------------------- кости лука и стрелы, привязка мешей
+# (меши -- *Mesh: в Unity имена объектов и костей не должны совпадать, их ищут по имени)
 bpy.context.view_layer.objects.active = rig
 bpy.ops.object.mode_set(mode="EDIT")
 eb = arm_data.edit_bones
@@ -359,6 +360,10 @@ b.head, b.tail = STRING_REST, STRING_REST + (TIP_A - TIP_B).normalized() * 0.05
 b.parent = eb["Bow"]
 b = eb.new("ArrowRest")
 b.head, b.tail = ARROW_REST_PT, ARROW_REST_PT + Vector((0, 0, 0.03))
+b.parent = eb["Bow"]
+b.use_deform = False
+b = eb.new("BowTop")                               # верхний рог: по нему Unity ставит лук под позы Mixamo
+b.head, b.tail = TIP_A, TIP_A + (TIP_A - TIP_B).normalized() * 0.03
 b.parent = eb["Bow"]
 b.use_deform = False
 b = eb.new("ArrowNock")
@@ -387,7 +392,7 @@ def skin(obj, bone_of_vertex):
     obj.modifiers.new("Armature", "ARMATURE").object = rig
 
 
-string_obj = bpy.data.objects.new("BowString", string_me)
+string_obj = bpy.data.objects.new("BowStringMesh", string_me)
 scene.collection.objects.link(string_obj)
 for m in MAT_ORDER:
     string_me.materials.append(MATS[m])

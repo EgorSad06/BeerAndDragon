@@ -5,8 +5,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 // Настройки импорта моделей врагов из Assets/Game/Assets/enemies (их собирают скрипты tools/blender/*.py):
-//  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo); у моделей из GenericModels -- Generic:
-//    Humanoid не импортирует анимацию дополнительных костей, а у лучника это тетива и стрела;
+//  - риг Humanoid (на него ложатся анимации Mixamo; их импорт -- MixamoClipImporter, папка Animations/Mixamo);
 //  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle, Walk и Block зациклены; движение корня (наклон и
 //    опускание таза в Death, шаг в Attack) запечено в позу -- враг двигается скриптом, root motion не нужен;
 //  - события: в Shoot (лучник) -- OnArrowRelease на кадре, где отпущена тетива; в Attack -- OnAttackHit на кадре
@@ -18,12 +17,18 @@ public class EnemyModelImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Assets/enemies/";
     private static readonly string[] Looped = { "Idle", "Walk", "Block" };
-    private static readonly string[] GenericModels = { "SkeletonArcher" };
     private const float ShootReleaseFrame = 2f;   // от начала клипа Shoot (tools/blender/skeleton_archer.py)
     private const float AttackHitFrame = 14f;     // от начала клипа Attack: удар проходит перед скелетом
     private static readonly string[] StaticModels = { "Arrow" };   // без рига и анимаций (снаряды)
 
-    private bool IsEnemyAsset => assetPath.Replace('\\', '/').StartsWith(Folder);
+    private bool IsEnemyAsset
+    {
+        get
+        {
+            string path = assetPath.Replace('\\', '/');
+            return path.StartsWith(Folder) && !path.StartsWith(MixamoClipImporter.Folder);
+        }
+    }
 
     void OnPreprocessModel()
     {
@@ -38,8 +43,7 @@ public class EnemyModelImporter : AssetPostprocessor
             m.materialLocation = ModelImporterMaterialLocation.External;
             return;
         }
-        bool generic = GenericModels.Contains(name);
-        m.animationType = generic ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.Human;
+        m.animationType = ModelImporterAnimationType.Human;
         m.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
         m.importAnimation = true;
         m.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;

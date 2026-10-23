@@ -2,15 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
-// ИИ скелетов. Одна логика на три роли (роль ставит SkeletonCreepBuilder):
-//  - Melee (крип): заметил игрока -> идёт к нему -> в досягаемости бьёт; урон -- в момент удара (событие AttackHit);
-//  - Shield (щитовик): как крип, но видит меч игрока: замах -- поднимает щит, начало удара -- иногда парирует
-//    и сразу бьёт в ответ; получил удар без щита -- может закрыться;
-//  - Archer (лучник): держит дистанцию minRange..maxRange (подходит/отступает), стреляет стрелой SkeletonArrow
-//    с упреждением и навесом (событие ArrowReleased), без прямой видимости подходит.
+// ИИ скелетов. Одна логика на три роли (роль и скорости ставит SkeletonCreepBuilder):
+//  - Melee (крип): заметил игрока -> бежит к нему, вблизи шаркает шагом -> в досягаемости бьёт (одна из атак);
+//    урон -- в момент удара (событие AttackHit);
+//  - Shield (щитовик): как крип, но между ударами обходит игрока боком; видит меч игрока: замах -- поднимает щит,
+//    начало удара -- иногда парирует и сразу бьёт в ответ; получил удар без щита -- может закрыться;
+//  - Archer (лучник): держит дистанцию minRange..maxRange (подходит/отступает), между выстрелами смещается боком;
+//    стреляет стрелой SkeletonArrow с упреждением и навесом (событие ArrowReleased); без прямой видимости подходит.
+// Получив удар, вздрагивает (не чаще раза в hitReactCooldown, прерывает атаку). В покое крип иногда почёсывается.
 // Замечает игрока в sightRange при прямой видимости или когда его ранили; теряет дальше loseRange.
 // Ходит CharacterController-ом с гравитацией; если в сцене запечён NavMesh -- по пути в обход препятствий,
-// иначе напрямую. Скелеты расталкиваются, чтобы не стоять в одной точке.
+// иначе напрямую. Скорости -- как шаг в анимациях (ноги не скользят). Скелеты расталкиваются.
 [RequireComponent(typeof(SkeletonCreep), typeof(CharacterController))]
 public class SkeletonAI : MonoBehaviour
 {
@@ -23,8 +25,11 @@ public class SkeletonAI : MonoBehaviour
     public float loseRange = 26f;
     public float eyeHeight = 1.6f;
 
-    [Header("Ходьба")]
+    [Header("Ходьба (м/с -- как шаг в анимациях)")]
     public float walkSpeed = 1.2f;
+    public float runSpeed = 0f;             // 0 -- не бегает
+    public float runDistance = 6f;          // дальше -- бежит
+    public float strafeSpeed = 0f;          // 0 -- не ходит боком
     public float turnSpeed = 300f;          // град/с
     public float personalSpace = 0.9f;      // расталкивание с другими скелетами
 
@@ -34,6 +39,10 @@ public class SkeletonAI : MonoBehaviour
     public float hitAngle = 70f;
     public float damage = 12f;
     public float attackCooldown = 1.0f;
+
+    [Header("Реакции")]
+    public float hitReactCooldown = 1.2f;
+    public Vector2 fidgetEvery = new Vector2(7f, 14f);   // крип в покое почёсывается раз в столько секунд
 
     [Header("Щит")]
     public float threatRange = 3.5f;        // с какого расстояния следит за мечом игрока
@@ -65,6 +74,10 @@ public class SkeletonAI : MonoBehaviour
     private float busyUntil;
     private float nextAttack;
     private float blockUntil;
+    private float nextHitReact;
+    private float nextFidget;
+    private float strafeSide = 1f;
+    private float nextStrafeFlip;
     private bool wasSwinging;
     private float swingRoll;
     private bool parriedThisSwing;
@@ -79,6 +92,7 @@ public class SkeletonAI : MonoBehaviour
         path = new NavMeshPath();
         foreach (Transform t in GetComponentsInChildren<Transform>(true))
             if (t.name == "ArrowNock") arrowNock = t;
+        nextFidget = Time.time + Random.Range(fidgetEvery.x, fidgetEvery.y);
     }
 
     void OnEnable()
@@ -108,7 +122,7 @@ public class SkeletonAI : MonoBehaviour
         if (player == null || player.IsDead)
         {
             aggro = false;
-            Stand();
+            Calm();
             creep.SetBlocking(false);
             return;
         }
@@ -124,12 +138,21 @@ public class SkeletonAI : MonoBehaviour
         if (aggro && dist > loseRange) aggro = false;
         if (!aggro)
         {
-            Stand();
+            Calm();
             return;
         }
 
-        if (role == Role.Archer) ArcherUpdate(player, target, dist);
+        if (role == Role.Archer) ArcherUpdate(target, dist);
         else MeleeUpdate(player, target, dist);
+    }
+
+    // Покой: стоит, крип иногда почёсывается
+    private void Calm()
+    {
+        Stand();
+        if (Time.time < nextFidget) return;
+        nextFidget = Time.time + Random.Range(fidgetEvery.x, fidgetEvery.y);
+        if (role == Role.Melee) creep.Fidget();
     }
 
     // ---------------------------------------------------------------- ближний бой и щит
@@ -145,16 +168,22 @@ public class SkeletonAI : MonoBehaviour
         }
         if (dist > attackRange)
         {
-            MoveTowards(target);
+            MoveTowards(target, dist > runDistance && runSpeed > 0f ? runSpeed : walkSpeed);
             return;
         }
-        Stand();
-        Face(target);
         if (Time.time >= nextAttack && FacingAngle(target) < 30f)
         {
-            creep.Attack();
-            busyUntil = Time.time + creep.ClipLength("Attack");
+            Stand();
+            busyUntil = Time.time + creep.Attack();
             nextAttack = busyUntil + attackCooldown * Random.Range(0.6f, 1.3f);
+            return;
+        }
+        // ждёт удара: щитовик обходит игрока боком, крип стоит лицом к нему
+        if (strafeSpeed > 0f && dist > attackRange * 0.6f) Circle(target);
+        else
+        {
+            Stand();
+            Face(target);
         }
     }
 
@@ -201,12 +230,17 @@ public class SkeletonAI : MonoBehaviour
     private void OnDamaged(float amount)
     {
         aggro = true;                           // ранили издалека -- всё равно идёт мстить
-        if (role == Role.Shield && !creep.IsBlocking && !creep.IsParrying && Random.value < blockOnHitChance)
-            blockUntil = Time.time + 1.5f;
+        if (creep.IsBlocking || creep.IsParrying) return;
+        if (role == Role.Shield && Random.value < blockOnHitChance) blockUntil = Time.time + 1.5f;
+        if (Time.time >= nextHitReact)
+        {
+            nextHitReact = Time.time + hitReactCooldown;
+            busyUntil = Time.time + creep.Hit() * 0.8f;   // удар прерывает атаку
+        }
     }
 
     // ---------------------------------------------------------------- лучник
-    private void ArcherUpdate(PlayerHealth player, Vector3 target, float dist)
+    private void ArcherUpdate(Vector3 target, float dist)
     {
         if (Time.time < busyUntil)
         {
@@ -217,21 +251,26 @@ public class SkeletonAI : MonoBehaviour
         SkeletonTactics.RangeMove move = SkeletonTactics.ArcherMove(dist, minRange, maxRange);
         if (move == SkeletonTactics.RangeMove.Advance || !canSee)
         {
-            MoveTowards(target);
+            MoveTowards(target, walkSpeed);
             return;
         }
         if (move == SkeletonTactics.RangeMove.Retreat)
         {
-            Move(Flat(transform.position - target).normalized);
+            Move(Flat(transform.position - target).normalized * walkSpeed, null);
             return;
         }
-        Stand();
-        Face(target);
         if (Time.time >= nextAttack && FacingAngle(target) < 15f)
         {
-            creep.Attack();
-            busyUntil = Time.time + creep.ClipLength("Draw") + creep.ClipLength("Shoot");
+            Stand();
+            busyUntil = Time.time + creep.Attack();
             nextAttack = busyUntil + shootCooldown * Random.Range(0.7f, 1.4f);
+            return;
+        }
+        if (strafeSpeed > 0f) Circle(target);   // между выстрелами смещается боком
+        else
+        {
+            Stand();
+            Face(target);
         }
     }
 
@@ -249,7 +288,7 @@ public class SkeletonAI : MonoBehaviour
     }
 
     // ---------------------------------------------------------------- движение
-    private void MoveTowards(Vector3 target)
+    private void MoveTowards(Vector3 target, float speed)
     {
         Vector3 next = target;
         if (Time.time >= nextRepath)
@@ -262,10 +301,24 @@ public class SkeletonAI : MonoBehaviour
             next = path.corners[1];
             if (Flat(next - transform.position).magnitude < 0.3f && path.corners.Length > 2) next = path.corners[2];
         }
-        Move(Flat(next - transform.position).normalized);
+        Move(Flat(next - transform.position).normalized * speed, null);
     }
 
-    private void Move(Vector3 dir)
+    // Обход цели боком (лицом к ней); направление меняется раз в 1.5..3.5 с
+    private void Circle(Vector3 target)
+    {
+        if (Time.time >= nextStrafeFlip)
+        {
+            nextStrafeFlip = Time.time + Random.Range(1.5f, 3.5f);
+            strafeSide = Random.value < 0.5f ? -1f : 1f;
+        }
+        Vector3 toTarget = Flat(target - transform.position).normalized;
+        Vector3 side = Vector3.Cross(Vector3.up, toTarget) * strafeSide;
+        Move(side * strafeSpeed, target);
+    }
+
+    // velocity -- куда идти (м/с); lookAt -- куда смотреть (null -- по ходу)
+    private void Move(Vector3 velocity, Vector3? lookAt)
     {
         Vector3 push = Vector3.zero;              // расталкивание с соседями
         foreach (SkeletonAI other in All)
@@ -275,16 +328,19 @@ public class SkeletonAI : MonoBehaviour
             if (d.magnitude < personalSpace && d.sqrMagnitude > 0.0001f)
                 push += d.normalized * (1f - d.magnitude / personalSpace);
         }
-        Vector3 velocity = (dir + push).normalized * walkSpeed;
-        controller.SimpleMove(velocity);
-        creep.SetSpeed(walkSpeed);
-        if (dir.sqrMagnitude > 0.0001f) TurnTo(dir);
+        float speed = velocity.magnitude;
+        Vector3 v = speed > 0.0001f ? (velocity / speed + push).normalized * speed : Vector3.zero;
+        controller.SimpleMove(v);
+        if (lookAt.HasValue) Face(lookAt.Value);
+        else if (v.sqrMagnitude > 0.0001f) TurnTo(v);
+        // анимация -- по скорости относительно взгляда (шаг вперёд, назад, вбок)
+        creep.SetMove(Vector3.Dot(v, transform.forward), Vector3.Dot(v, transform.right));
     }
 
     private void Stand()
     {
         if (controller.enabled) controller.SimpleMove(Vector3.zero);   // гравитация
-        creep.SetSpeed(0f);
+        creep.SetMove(0f, 0f);
     }
 
     private void Face(Vector3 target) => TurnTo(Flat(target - transform.position));

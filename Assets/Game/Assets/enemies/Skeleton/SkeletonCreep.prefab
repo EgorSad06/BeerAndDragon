@@ -143,6 +143,12 @@ MonoBehaviour:
   shieldPaint: -1
   blockedDamage: 0.2
   parryTime: 0.35
+  attackClips:
+  - creep_attack1
+  - creep_attack2
+  - creep_attack3
+  hitClip: creep_hit
+  deathVariants: 2
 --- !u!114 &935627288189956907
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -159,7 +165,10 @@ MonoBehaviour:
   sightRange: 16
   loseRange: 26
   eyeHeight: 1.6
-  walkSpeed: 1.2
+  walkSpeed: 0.45
+  runSpeed: 3.1
+  runDistance: 4
+  strafeSpeed: 0
   turnSpeed: 300
   personalSpace: 0.9
   attackRange: 1.6
@@ -167,6 +176,8 @@ MonoBehaviour:
   hitAngle: 70
   damage: 12
   attackCooldown: 1
+  hitReactCooldown: 1.2
+  fidgetEvery: {x: 7, y: 14}
   threatRange: 3.5
   parryChance: 0.35
   blockOnHitChance: 0.5

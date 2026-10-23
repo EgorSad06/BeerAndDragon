@@ -10,7 +10,8 @@ art/weapons/VikingShields/textures/paint1..8.png.
       Block (щит поднят, цикл), BlockHit (удар по щиту), Parry (отбив щитом в сторону), Death
   Assets/Game/Assets/enemies/SkeletonShield/Textures/*.png       -- SKS_Paint1..8 -- раскраски (выбирает SkeletonCreep)
 
-Щит держится за рукоять за умбоном: кость Shield (ребёнок Hand.L) в кулаке. Как щит сидит в руке, задаёт поза
+Щит держится за рукоять за умбоном: кость Shield у кулака, на предплечье (ребёнок LowerArm.L -- как в анимациях
+Mixamo). Как щит сидит в руке, задаёт поза
 защиты: в ней щит смотрит вперёд и чуть наружу; в остальных позах кисть поворачивается от этой.
 """
 import math
@@ -148,8 +149,8 @@ def shield_place(p):
 
 for v in sme.vertices:
     v.co = shield_place(v.co.copy())
-shield = bpy.data.objects.new("Shield", sme)
-sme.name = "Shield"
+shield = bpy.data.objects.new("ShieldMesh", sme)   # не «Shield»: так называется кость
+sme.name = "ShieldMesh"
 scene.collection.objects.link(shield)
 dec = shield.modifiers.new("Decimate", "DECIMATE")
 dec.ratio = SHIELD_TRIS / sum(len(p.vertices) - 2 for p in sme.polygons)
@@ -162,7 +163,14 @@ bpy.ops.object.mode_set(mode="EDIT")
 eb = rig.data.edit_bones.new("Shield")
 eb.head = L_FIST
 eb.tail = L_FIST + W0["Hand.L"].inverted() @ face * 0.12
-eb.parent = rig.data.edit_bones["Hand.L"]
+eb.parent = rig.data.edit_bones["LowerArm.L"]   # в анимациях Mixamo щит -- на предплечье
+# метки для Unity (ставит щит под позы Mixamo): верх щита и его лицевая сторона
+for name, direction in (("ShieldTop", up), ("ShieldFront", face)):
+    mark = rig.data.edit_bones.new(name)
+    mark.head = L_FIST + W0["Hand.L"].inverted() @ direction * 0.3
+    mark.tail = mark.head + W0["Hand.L"].inverted() @ direction * 0.03
+    mark.parent = eb
+    mark.use_deform = False
 bpy.ops.object.mode_set(mode="OBJECT")
 pose.refresh()
 shield.vertex_groups.new(name="Shield").add(list(range(len(sme.vertices))), 1.0, "REPLACE")

@@ -48,14 +48,58 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -5372419049045223218, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.5514389
+      objectReference: {fileID: 0}
+    - target: {fileID: -5372419049045223218, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.14491355
+      objectReference: {fileID: 0}
+    - target: {fileID: -934813414602434582, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.8550578
+      objectReference: {fileID: 0}
+    - target: {fileID: -934813414602434582, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.51744795
+      objectReference: {fileID: 0}
+    - target: {fileID: -934813414602434582, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.016737675
+      objectReference: {fileID: 0}
+    - target: {fileID: -934813414602434582, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.029045887
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
       propertyPath: m_Name
       value: SkeletonArcher
+      objectReference: {fileID: 0}
+    - target: {fileID: 4644306640089593372, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.3090952
+      objectReference: {fileID: 0}
+    - target: {fileID: 4644306640089593372, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.7983908
+      objectReference: {fileID: 0}
+    - target: {fileID: 4644306640089593372, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.40264744
+      objectReference: {fileID: 0}
+    - target: {fileID: 4644306640089593372, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.32389408
       objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 0c55d2914b476654d8c4528ee7262488, type: 2}
+    - target: {fileID: 5866666021909216657, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -72,6 +116,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7219080540383324316}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2674967076313321612}
   m_SourcePrefab: {fileID: 100100000, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
 --- !u!1 &1827637905079870207 stripped
 GameObject:
@@ -139,6 +186,10 @@ MonoBehaviour:
   shieldPaint: -1
   blockedDamage: 0.2
   parryTime: 0.35
+  attackClips:
+  - archer_draw+archer_aim+archer_shoot
+  hitClip: archer_hit
+  deathVariants: 1
 --- !u!114 &7219080540383324316
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -155,7 +206,10 @@ MonoBehaviour:
   sightRange: 16
   loseRange: 26
   eyeHeight: 1.6
-  walkSpeed: 1.2
+  walkSpeed: 1.02
+  runSpeed: 0
+  runDistance: 0
+  strafeSpeed: 1.35
   turnSpeed: 300
   personalSpace: 0.9
   attackRange: 1.6
@@ -163,6 +217,8 @@ MonoBehaviour:
   hitAngle: 70
   damage: 12
   attackCooldown: 1
+  hitReactCooldown: 1.2
+  fidgetEvery: {x: 7, y: 14}
   threatRange: 3.5
   parryChance: 0.35
   blockOnHitChance: 0.5
@@ -173,3 +229,15 @@ MonoBehaviour:
   arrowSpeed: 28
   arrowDamage: 10
   shootCooldown: 1.2
+--- !u!114 &2674967076313321612
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1827637905079870207}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f9ccf7af26b9b041ae8f175b1d24bea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BowRig
