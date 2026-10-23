@@ -8,6 +8,7 @@ using UnityEngine.Rendering;
 //  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo);
 //  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены;
 //  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
+//    если есть Textures/<материал>_Emission.png -- это карта свечения (синие глаза на текстуре скелета);
 //  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у ореола края не повторяются (Clamp).
 public class EnemyModelImporter : AssetPostprocessor
 {
@@ -49,6 +50,25 @@ public class EnemyModelImporter : AssetPostprocessor
         material.SetFloat("_Smoothness", 0.05f);
         if (material.name.EndsWith("EyeGlow")) MakeAdditiveGlow(material);
         else if (material.name.EndsWith("EyeFire")) MakeGlow(material, new Color(0.05f, 0.3f, 1f) * 6f);
+        else
+        {
+            Texture2D map = AssetDatabase.LoadAssetAtPath<Texture2D>(TexturePath(material.name + "_Emission"));
+            if (map != null) AddEmissionMap(material, map);
+        }
+    }
+
+    private string TexturePath(string name) =>
+        Path.Combine(Path.GetDirectoryName(assetPath), "Textures", name + ".png").Replace('\\', '/');
+
+    // Светятся только непустые пиксели карты (глаза на текстуре скелета)
+    private static void AddEmissionMap(Material material, Texture2D map)
+    {
+        material.SetTexture("_EmissionMap", map);
+        Color hdr = new Color(0.45f, 0.7f, 1f) * 2.5f;   // синее, без пересвета в бирюзу
+        hdr.a = 1f;
+        material.SetColor("_EmissionColor", hdr);
+        material.EnableKeyword("_EMISSION");
+        material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
     }
 
     private static void MakeGlow(Material material, Color hdr)
