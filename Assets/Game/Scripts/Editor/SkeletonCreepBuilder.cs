@@ -3,10 +3,12 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 
-// Собирает готовых врагов-скелетов из моделей tools/blender/skeleton_psx.py и skeleton_archer.py:
+// Собирает готовых врагов-скелетов из моделей tools/blender/skeleton_psx.py, skeleton_archer.py, skeleton_shield.py:
 //  - <модель>.controller: Idle <-> Walk по Speed; по триггеру Attack (из Idle и Walk) -- цепочка атаки
-//    (крип: Attack; лучник: Draw -> Shoot), потом Idle; Death по триггеру Die отовсюду;
-//  - префаб: модель + Animator + SkeletonCreep + Damageable + CapsuleCollider.
+//    (крип и щитовик: Attack; лучник: Draw -> Shoot), потом Idle; Death по триггеру Die отовсюду;
+//    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту в блоке), Parry (из Idle, Walk, Block);
+//  - префаб: модель + Animator + SkeletonCreep + Damageable + CapsuleCollider;
+//  - у щитовика -- материалы раскрасок SKS_Paint1..8 (копии SKS_Paint1 со своей текстурой) в SkeletonCreep.shieldPaints.
 // Запуск: меню Tools/BeerAndDragon/Build Skeleton Enemies (или -executeMethod SkeletonCreepBuilder.Build).
 public static class SkeletonCreepBuilder
 {
@@ -17,6 +19,7 @@ public static class SkeletonCreepBuilder
         public string Folder, Model, Prefab;
         public string[] AttackChain;
         public float Health;
+        public bool Shield;
     }
 
     private static readonly Variant[] Variants =
@@ -25,6 +28,8 @@ public static class SkeletonCreepBuilder
                       AttackChain = new[] { "Attack" }, Health = 60f },
         new Variant { Folder = "SkeletonArcher", Model = "SkeletonArcher", Prefab = "SkeletonArcher",
                       AttackChain = new[] { "Draw", "Shoot" }, Health = 40f },
+        new Variant { Folder = "SkeletonShield", Model = "SkeletonShield", Prefab = "SkeletonShield",
+                      AttackChain = new[] { "Attack" }, Health = 80f, Shield = true },
     };
 
     [MenuItem("Tools/BeerAndDragon/Build Skeleton Enemies")]
@@ -39,7 +44,7 @@ public static class SkeletonCreepBuilder
         string dir = Root + v.Folder;
         string modelPath = $"{dir}/{v.Model}.fbx";
         string prefabPath = $"{dir}/{v.Prefab}.prefab";
-        AnimatorController controller = BuildController($"{dir}/{v.Model}.controller", modelPath, v.AttackChain);
+        AnimatorController controller = BuildController($"{dir}/{v.Model}.controller", modelPath, v.AttackChain, v.Shield);
         GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
         GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(model);
         go.name = v.Prefab;
@@ -59,14 +64,40 @@ public static class SkeletonCreepBuilder
         health.destroyOnDeath = true;
         health.destroyDelay = 6f;   // тело лежит, потом исчезает
 
-        go.AddComponent<SkeletonCreep>();
+        SkeletonCreep creep = go.AddComponent<SkeletonCreep>();
+        if (v.Shield) creep.shieldPaints = BuildShieldPaints(dir);
 
         PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
         Object.DestroyImmediate(go);
         Debug.Log($"[SkeletonCreep] {prefabPath}");
     }
 
-    private static AnimatorController BuildController(string path, string modelPath, string[] attackChain)
+    // SKS_Paint1 импортирован из FBX; остальные раскраски -- его копии с текстурами Textures/SKS_Paint<n>.png
+    private static Material[] BuildShieldPaints(string dir)
+    {
+        Material first = AssetDatabase.LoadAssetAtPath<Material>($"{dir}/Materials/SKS_Paint1.mat");
+        var paints = new System.Collections.Generic.List<Material> { first };
+        for (int i = 2; ; i++)
+        {
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/Textures/SKS_Paint{i}.png");
+            if (tex == null) break;
+            string path = $"{dir}/Materials/SKS_Paint{i}.mat";
+            Material m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(first);
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.CopyPropertiesFromMaterial(first);
+            m.SetTexture("_BaseMap", tex);
+            m.mainTexture = tex;
+            EditorUtility.SetDirty(m);
+            paints.Add(m);
+        }
+        return paints.ToArray();
+    }
+
+    private static AnimatorController BuildController(string path, string modelPath, string[] attackChain, bool shield)
     {
         AssetDatabase.DeleteAsset(path);
         AnimatorController c = AnimatorController.CreateAnimatorControllerAtPath(path);
@@ -117,10 +148,41 @@ public static class SkeletonCreepBuilder
         t.exitTime = 0.95f;
         t.duration = 0.1f;
 
+        if (shield) AddShieldStates(c, sm, idle, walk, Clip);
+
         t = sm.AddAnyStateTransition(death);
         t.canTransitionToSelf = false;
         Instant(t, 0.1f).AddCondition(AnimatorConditionMode.If, 0, "Die");
         return c;
+    }
+
+    private static void AddShieldStates(AnimatorController c, AnimatorStateMachine sm, AnimatorState idle,
+                                        AnimatorState walk, System.Func<string, AnimationClip> clip)
+    {
+        c.AddParameter("Blocking", AnimatorControllerParameterType.Bool);
+        c.AddParameter("Parry", AnimatorControllerParameterType.Trigger);
+        c.AddParameter("BlockHit", AnimatorControllerParameterType.Trigger);
+        AnimatorState block = sm.AddState("Block", new Vector3(50, 60));
+        AnimatorState hit = sm.AddState("BlockHit", new Vector3(-200, 60));
+        AnimatorState parry = sm.AddState("Parry", new Vector3(50, 220));
+        block.motion = clip("Block");
+        hit.motion = clip("BlockHit");
+        parry.motion = clip("Parry");
+
+        foreach (AnimatorState from in new[] { idle, walk })
+            Instant(from.AddTransition(block), 0.12f).AddCondition(AnimatorConditionMode.If, 0, "Blocking");
+        Instant(block.AddTransition(idle), 0.15f).AddCondition(AnimatorConditionMode.IfNot, 0, "Blocking");
+        Instant(block.AddTransition(hit), 0.03f).AddCondition(AnimatorConditionMode.If, 0, "BlockHit");
+        AnimatorStateTransition t = hit.AddTransition(block);
+        t.hasExitTime = true;
+        t.exitTime = 0.9f;
+        t.duration = 0.1f;
+        foreach (AnimatorState from in new[] { idle, walk, block })
+            Instant(from.AddTransition(parry), 0.05f).AddCondition(AnimatorConditionMode.If, 0, "Parry");
+        t = parry.AddTransition(idle);
+        t.hasExitTime = true;
+        t.exitTime = 0.95f;
+        t.duration = 0.1f;
     }
 
     private static AnimatorStateTransition Instant(AnimatorStateTransition t, float blend)

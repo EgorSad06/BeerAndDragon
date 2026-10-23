@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 // Настройки импорта моделей врагов из Assets/Game/Assets/enemies (их собирают скрипты tools/blender/*.py):
 //  - риг Humanoid (подходят анимации с других гуманоидов, например Mixamo); у моделей из GenericModels -- Generic:
 //    Humanoid не импортирует анимацию дополнительных костей, а у лучника это тетива и стрела;
-//  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle и Walk зациклены; движение корня (наклон и
+//  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle, Walk и Block зациклены; движение корня (наклон и
 //    опускание таза в Death, шаг в Attack) запечено в позу -- враг двигается скриптом, root motion не нужен;
 //  - в Shoot (лучник) -- событие OnArrowRelease на кадре, где отпущена тетива (SkeletonCreep.ArrowReleased);
 //  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
@@ -16,7 +16,7 @@ using UnityEngine.Rendering;
 public class EnemyModelImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Assets/enemies/";
-    private static readonly string[] Looped = { "Idle", "Walk" };
+    private static readonly string[] Looped = { "Idle", "Walk", "Block" };
     private static readonly string[] GenericModels = { "SkeletonArcher" };
     private const float ShootReleaseFrame = 2f;   // от начала клипа Shoot (tools/blender/skeleton_archer.py)
 

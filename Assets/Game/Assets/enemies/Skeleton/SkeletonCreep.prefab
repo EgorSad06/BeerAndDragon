@@ -120,6 +120,7 @@ MonoBehaviour:
   deathEffectPrefab: {fileID: 0}
   flashColor: {r: 1, g: 0, b: 0, a: 1}
   flashTime: 0.08
+  damageMultiplier: 1
 --- !u!114 &5541114136500514632
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -133,3 +134,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SkeletonCreep
   weapon: 
+  shieldPaints: []
+  shieldPaint: -1
+  blockedDamage: 0.2
+  parryTime: 0.35

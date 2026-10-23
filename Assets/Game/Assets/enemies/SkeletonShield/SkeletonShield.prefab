@@ -1,0 +1,156 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &7502541005114841047
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_Name
+      value: SkeletonShield
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: f2dcc7aabe3ceb84d80fea264632961f, type: 2}
+    - target: {fileID: 5866666021909216657, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6666910509117134809, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.025926892
+      objectReference: {fileID: 0}
+    - target: {fileID: 6666910509117134809, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.008988467
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4240500220220504930}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4929447616908083323}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8131770873052680596}
+  m_SourcePrefab: {fileID: 100100000, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+--- !u!1 &7268537783912835718 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+  m_PrefabInstance: {fileID: 7502541005114841047}
+  m_PrefabAsset: {fileID: 0}
+--- !u!136 &4240500220220504930
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7268537783912835718}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.3
+  m_Height: 1.8
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.9, z: 0}
+--- !u!114 &4929447616908083323
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7268537783912835718}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02a146a419428244893540e60fe65bdd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Damageable
+  maxHealth: 80
+  destroyOnDeath: 1
+  destroyDelay: 6
+  deathEffectPrefab: {fileID: 0}
+  flashColor: {r: 1, g: 0, b: 0, a: 1}
+  flashTime: 0.08
+  damageMultiplier: 1
+--- !u!114 &8131770873052680596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7268537783912835718}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aed5a53ca6903fd4880d122a7b8b45c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkeletonCreep
+  weapon: 
+  shieldPaints:
+  - {fileID: 2100000, guid: 395d4c7e6be3c7e43939a811abd55dd0, type: 2}
+  - {fileID: 2100000, guid: 209347850c6de5142a36a60c4c8a7981, type: 2}
+  - {fileID: 2100000, guid: 9f1764625f135364db0f9e7a86db244b, type: 2}
+  - {fileID: 2100000, guid: dd660600656337b4ab6226cb2740909b, type: 2}
+  - {fileID: 2100000, guid: 233ca890b2a68ec4eab56eaa994acf63, type: 2}
+  - {fileID: 2100000, guid: 719f48ed21621334299c0128fac70ef0, type: 2}
+  - {fileID: 2100000, guid: 45420ce63c534bc44bd5b335d3e20a9c, type: 2}
+  - {fileID: 2100000, guid: e6702cf2e3b08db438ce52bfc8e44ccd, type: 2}
+  shieldPaint: -1
+  blockedDamage: 0.2
+  parryTime: 0.35

@@ -25,8 +25,11 @@ import sys
 
 import bmesh
 import bpy
-import numpy as np
 from mathutils import Matrix, Quaternion, Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from skeleton_common import (Pose, export_fbx, fists, material, merge, preview_stage, save_blend, tex,  # noqa: E402
+                             walk_legs, wave)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC_BLEND = os.path.join(ROOT, "art", "enemies", "skeleton.blend")
@@ -70,70 +73,14 @@ img.filepath = os.path.join(TEX_DIR, "SKA_Bone.png")
 img.reload()
 
 # ---------------------------------------------------------------- текстуры PS1 для лука и колчана
-rng = np.random.default_rng(9)
-BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0 - 0.5
-
-
-def noise(n, scale):
-    out = np.zeros((n, n))
-    for octave, amp in ((4, 0.5), (8, 0.3), (16, 0.2)):
-        g = rng.random((octave + 1, octave + 1))
-        xs = np.linspace(0, octave, n, endpoint=False)
-        i, f = xs.astype(int), xs - xs.astype(int)
-        y0 = g[i][:, i] * (1 - f)[None, :] + g[i][:, i + 1] * f[None, :]
-        y1 = g[i + 1][:, i] * (1 - f)[None, :] + g[i + 1][:, i + 1] * f[None, :]
-        out += amp * (y0 * (1 - f)[:, None] + y1 * f[:, None])
-    return (out - out.min()) / (np.ptp(out) + 1e-6) * scale
-
-
-def ps1(rgb):
-    """15-битный цвет с упорядоченным дизерингом и зерном, как в skeleton_psx.py."""
-    n = rgb.shape[0]
-    rgb = rgb * (0.9 + 0.2 * rng.random((n, n, 1)))
-    dither = np.tile(BAYER, (n // 4, n // 4))[..., None] / 31
-    return np.floor(np.clip(rgb + dither, 0, 1) * 31 + 0.5) / 31
-
-
-def tex(color, spread=0.4, stripes=0):
-    n = 32
-    base = np.array(color) * (1 - spread / 2 + spread * noise(n, 1.0))[..., None]
-    if stripes:
-        base[::stripes] *= 0.6
-    return ps1(base)
-
-
-def save_texture(name, rgb):
-    h, w = rgb.shape[:2]
-    im = bpy.data.images.new(name, w, h)
-    px = np.ones((h, w, 4))
-    px[:, :, :3] = np.clip(rgb, 0, 1)
-    im.pixels = px[::-1].ravel()
-    im.filepath_raw = os.path.join(TEX_DIR, name + ".png")
-    im.file_format = "PNG"
-    im.save()
-    return im
-
-
-def material(name, rgb):
-    m = bpy.data.materials.new(name)
-    m.use_nodes = True
-    nt = m.node_tree
-    bsdf = nt.nodes["Principled BSDF"]
-    bsdf.inputs["Roughness"].default_value = 0.9
-    t = nt.nodes.new("ShaderNodeTexImage")
-    t.image, t.interpolation = save_texture(name, rgb), "Closest"
-    nt.links.new(t.outputs["Color"], bsdf.inputs["Base Color"])
-    return m
-
-
 MATS = {
-    "wood": material("SKA_BowWood", tex((0.30, 0.17, 0.09), 0.5, stripes=4)),
-    "grip": material("SKA_Grip", tex((0.20, 0.12, 0.07), 0.5, stripes=2)),
-    "string": material("SKA_String", tex((0.70, 0.66, 0.55), 0.2)),
-    "quiver": material("SKA_Quiver", tex((0.33, 0.21, 0.12), 0.6, stripes=8)),
-    "shaft": material("SKA_Shaft", tex((0.55, 0.42, 0.26), 0.3)),
-    "head": material("SKA_ArrowHead", tex((0.45, 0.45, 0.47), 0.4)),
-    "feather": material("SKA_Feather", tex((0.62, 0.58, 0.52), 0.5, stripes=3)),
+    "wood": material(TEX_DIR, "SKA_BowWood", tex((0.30, 0.17, 0.09), 0.5, stripes=4)),
+    "grip": material(TEX_DIR, "SKA_Grip", tex((0.20, 0.12, 0.07), 0.5, stripes=2)),
+    "string": material(TEX_DIR, "SKA_String", tex((0.70, 0.66, 0.55), 0.2)),
+    "quiver": material(TEX_DIR, "SKA_Quiver", tex((0.33, 0.21, 0.12), 0.6, stripes=8)),
+    "shaft": material(TEX_DIR, "SKA_Shaft", tex((0.55, 0.42, 0.26), 0.3)),
+    "head": material(TEX_DIR, "SKA_ArrowHead", tex((0.45, 0.45, 0.47), 0.4)),
+    "feather": material(TEX_DIR, "SKA_Feather", tex((0.62, 0.58, 0.52), 0.5, stripes=3)),
 }
 MAT_ORDER = list(MATS)
 
@@ -255,99 +202,12 @@ def arrow_mat(nock, tip):
     return f
 
 
-# ---------------------------------------------------------------- поза: повороты осями мира в T-позе + IK рук
-AX = {"X": Vector((1, 0, 0)), "Y": Vector((0, 1, 0)), "Z": Vector((0, 0, 1))}
-
-
-def hierarchy():
-    order, todo = [], [b for b in arm_data.bones if b.parent is None]
-    while todo:
-        b = todo.pop(0)
-        order.append(b.name)
-        todo += list(b.children)
-    return order
-
-
-def rest_data():
-    global ORDER, H, T, REST, PARENT
-    ORDER = hierarchy()
-    H = {b.name: b.head_local.copy() for b in arm_data.bones}
-    T = {b.name: b.tail_local.copy() for b in arm_data.bones}
-    REST = {b.name: b.matrix_local.to_quaternion() for b in arm_data.bones}
-    PARENT = {b.name: b.parent.name if b.parent else None for b in arm_data.bones}
-
-
-rest_data()
-
-
-def solve(spec, hips=(0, 0, 0)):
-    """spec: кость -> список: ("X", град) -- поворот осью мира T-позы (по порядку), ("ROLL", град) -- вокруг своей
-    оси, ("IK", цель, полюс) -- у плеча: запястье в точку цель, локоть в сторону полюс; ("AIM", направление);
-    ("ORIENT", кватернион) -- поворот кости в мире.
-    Ответ: W (поворот кости в мире относительно T-позы), P (положение головы кости), own (свой поворот)."""
-    W, P, own, pending = {}, {}, {}, {}
-    for b in ORDER:
-        p = PARENT[b]
-        wp = W[p] if p else Quaternion()
-        P[b] = P[p] + wp @ (H[b] - H[p]) if p else H[b] + Vector(hips)
-        d = (T[b] - H[b]).normalized()
-        o = Quaternion()
-        for item in spec.get(b, []) + pending.pop(b, []):
-            kind = item[0]
-            if kind == "ROLL":
-                o = o @ Quaternion(d, math.radians(item[1]))
-            elif kind == "ORIENT":                     # поворот кости в мире задан целиком
-                o = wp.inverted() @ item[1]
-            elif kind == "AIM":
-                o = (o @ d).rotation_difference(wp.inverted() @ Vector(item[1]).normalized()) @ o
-            elif kind == "IK":
-                target, pole = Vector(item[1]), Vector(item[2])
-                lower = next(c.name for c in arm_data.bones[b].children)
-                hand = next(c.name for c in arm_data.bones[lower].children if c.name.startswith("Hand"))
-                l1, l2 = (H[lower] - H[b]).length, (H[hand] - H[lower]).length
-                to = target - P[b]
-                dist = min(to.length, (l1 + l2) * 0.999)
-                u = to.normalized()
-                v = (pole - u * pole.dot(u)).normalized()
-                a = (l1 * l1 - l2 * l2 + dist * dist) / (2 * dist)
-                elbow = P[b] + u * a + v * math.sqrt(max(l1 * l1 - a * a, 0.0))
-                o = (o @ d).rotation_difference(wp.inverted() @ (elbow - P[b]).normalized()) @ o
-                pending[lower] = [("AIM", P[b] + u * dist - elbow)]
-            else:
-                o = Quaternion(AX[kind], math.radians(item[1])) @ o
-        own[b] = o
-        W[b] = wp @ o
-    return W, P, own
-
-
-def at(bone, rest_point, W, P):
-    """Где окажется точка, жёстко привязанная к кости (в T-позе rest_point), в позе W, P."""
-    return P[bone] + W[bone] @ (Vector(rest_point) - H[bone])
-
-
+# ---------------------------------------------------------------- позы (skeleton_common.Pose: повороты, IK рук)
+pose = Pose(rig)
+H = pose.H
 L_FIST = H["Hand.L"] + Vector((0.055, 0, -0.02))     # середина кулака (в T-позе ладонь вниз)
 R_FINGERS = H["Index2.R"] + Vector((0, 0, -0.01))  # где пальцы держат стрелу
 TORSO_DRAW = {"Spine": [("Z", -22)], "Chest": [("Z", -22), ("X", -4)], "Neck": [("Z", 15)], "Head": [("Z", 25)]}
-FINGERS = [f"{f}{i}" for f in ("Index", "Middle", "Ring", "Little") for i in (1, 2, 3)]
-
-
-def merge(*specs):
-    out = {}
-    for s in specs:
-        for b, rots in s.items():
-            out[b] = out.get(b, []) + list(rots)
-    return out
-
-
-def fists(curl_l=60, curl_r=60):
-    p = {}
-    for s, side, curl in ((1, "L", curl_l), (-1, "R", curl_r)):
-        for f in FINGERS:
-            p[f"{f}.{side}"] = [("Y", s * curl)]
-        p[f"Thumb2.{side}"] = [("X", -25)]
-    return p
-
-
 LEGS_STAND = {"UpperLeg.L": [("X", -4), ("Y", -4)], "LowerLeg.L": [("X", 8)],
               "UpperLeg.R": [("X", -4), ("Y", 4)], "LowerLeg.R": [("X", 8)]}
 LEGS_AIM = {"UpperLeg.L": [("X", -14), ("Y", -8)], "LowerLeg.L": [("X", 12)],
@@ -356,7 +216,8 @@ LEGS_AIM = {"UpperLeg.L": [("X", -14), ("Y", -8)], "LowerLeg.L": [("X", 12)],
 
 def spec_idle():
     """Стоит наготове: лук вертикально в левой руке (кисть повёрнута как при прицеле), правая висит."""
-    return merge({"Hand.L": [("ORIENT", HAND_L_AIM)], "Spine": [("X", 5)], "Chest": [("X", 5)], "Neck": [("X", 6)], "Head": [("X", -4)],
+    return merge({"Hand.L": [("ORIENT", HAND_L_AIM)],
+                  "Spine": [("X", 5)], "Chest": [("X", 5)], "Neck": [("X", 6)], "Head": [("X", -4)],
                   "UpperArm.L": [("ROLL", -90), ("IK", (0.26, -0.2, 1.0), (0.5, 1, -0.6))],
                   "UpperArm.R": [("IK", (-0.27, 0.12, 0.92), (-0.6, 1, 0))]},
                  LEGS_STAND, fists(60, 45))
@@ -364,7 +225,7 @@ def spec_idle():
 
 def aim_points(W, P):
     """В позе натяжения: щека (куда тянется тетива) и точка, куда смотрит левая рука."""
-    cheek = at("Head", H["Head"] + Vector((-0.055, -0.1, 0.0)), W, P)
+    cheek = pose.at("Head", H["Head"] + Vector((-0.055, -0.1, 0.0)), W, P)
     return cheek
 
 
@@ -372,12 +233,12 @@ def spec_aim(draw):
     """Целится: корпус развёрнут левым плечом к цели, левая рука вперёд, правое запястье -- между тетивой
     (draw = 0) и щекой (draw = 1)."""
     s = merge(TORSO_DRAW, LEGS_AIM, fists(60, 35))
-    W, P, _ = solve(s)
+    W, P, _ = pose.solve(s)
     shoulder_l = P["UpperArm.L"]
     wrist_l = shoulder_l + Vector((0.0, -0.53, 0.03))
     s = merge(s, {"UpperArm.L": [("ROLL", -90), ("IK", wrist_l, (1, 0.3, -0.4))]})
-    W, P, _ = solve(s)
-    fist = at("Hand.L", L_FIST, W, P)
+    W, P, _ = pose.solve(s)
+    fist = pose.at("Hand.L", L_FIST, W, P)
     cheek = aim_points(W, P)
     line = (cheek - fist).normalized()
     string_rest = fist + line * BRACE
@@ -390,8 +251,8 @@ def spec_aim(draw):
 def spec_quiver():
     """Правая рука за плечом у колчана."""
     s = merge({"Spine": [("X", 3)], "Chest": [("Z", 10)], "Head": [("Z", -15)]}, LEGS_STAND, fists(60, 70))
-    W, P, _ = solve(s)
-    top = at("Chest", QUIVER_TOP, W, P)
+    W, P, _ = pose.solve(s)
+    top = pose.at("Chest", QUIVER_TOP, W, P)
     return merge(s, {"UpperArm.L": [("ROLL", -90), ("IK", (0.26, -0.2, 1.0), (0.5, 1, -0.6))],
                      "Hand.L": [("ORIENT", HAND_L_AIM)],
                      "UpperArm.R": [("IK", top + Vector((0.0, -0.03, 0.06)), (-0.4, -0.6, 0.9))]})
@@ -422,9 +283,9 @@ quiver_chunks += [(isl, lambda c: "feather") for isl in parts["quiver_fletch"]]
 quiver = build_mesh("Quiver", quiver_chunks, quiver_place, ratio=0.15)
 
 # ---------------------------------------------------------------- лук: место в кулаке задаётся позой прицеливания
-W_aim, P_aim, _ = solve(spec_aim(1.0))
+W_aim, P_aim, _ = pose.solve(spec_aim(1.0))
 HAND_L_AIM = W_aim["Hand.L"].copy()
-fist_w = at("Hand.L", L_FIST, W_aim, P_aim)
+fist_w = pose.at("Hand.L", L_FIST, W_aim, P_aim)
 cheek_w = aim_points(W_aim, P_aim)
 back_w = cheek_w - fist_w
 back_w.z = 0
@@ -501,7 +362,8 @@ b = eb.new("ArrowNock")
 b.head, b.tail = R_FINGERS, R_FINGERS + Vector((0, -0.1, 0))
 b.parent = eb["Hand.R"]
 bpy.ops.object.mode_set(mode="OBJECT")
-rest_data()
+pose.refresh()
+H = pose.H
 
 pb = rig.pose.bones["ArrowNock"]
 c = pb.constraints.new("DAMPED_TRACK")
@@ -535,23 +397,8 @@ print("[Archer] треугольников: " + ", ".join(f"{o.name} {sum(len(p.
                                             for o in [body] + gear))
 
 # ---------------------------------------------------------------- анимации
-LAST = {}
-
-
-def key_pose(frame, spec, hips=(0, 0, 0), nocked=0.0, arrow_shown=0.0):
-    _, _, own = solve(spec, hips)
-    for pb in rig.pose.bones:
-        pb.rotation_mode = "QUATERNION"
-        quat = REST[pb.name].inverted() @ own[pb.name] @ REST[pb.name]
-        prev = LAST.get(pb.name)
-        if prev is not None and prev.dot(quat) < 0:      # без «переворотов» между ключами
-            quat.negate()
-        LAST[pb.name] = quat
-        pb.rotation_quaternion = quat
-        pb.keyframe_insert("rotation_quaternion", frame=frame)
-    hb = rig.pose.bones["Hips"]
-    hb.location = REST["Hips"].inverted() @ Vector(hips)
-    hb.keyframe_insert("location", frame=frame)
+def gear_keys(frame, nocked=0.0, arrow_shown=0.0):
+    """Свои ключи лучника: видна ли стрела (масштаб ArrowNock), идёт ли тетива за пальцами (влияние)."""
     nb = rig.pose.bones["ArrowNock"]
     nb.scale = Vector((1, 1, 1)) * max(arrow_shown, 0.001)
     nb.keyframe_insert("scale", frame=frame)
@@ -560,43 +407,16 @@ def key_pose(frame, spec, hips=(0, 0, 0), nocked=0.0, arrow_shown=0.0):
     con.keyframe_insert("influence", frame=frame)
 
 
-def action(name, keys, loop=False):
-    """keys: [(кадр, spec, таз, тетива на стреле 0..1, стрела видна 0..1)]."""
-    rig.animation_data_create()
-    act = bpy.data.actions.new(name)
-    act.use_fake_user = True
-    rig.animation_data.action = act
-    LAST.clear()
-    for k in keys:
-        key_pose(*k)
-    end = keys[-1][0]
-    if loop:
-        end += keys[1][0] - keys[0][0]
-        key_pose(end, *keys[0][1:])
-    act.frame_range = (keys[0][0], end)
-    return act
-
-
-def wave(t):
-    return math.sin(t * 2 * math.pi)
-
-
+pose.extra = gear_keys
+action = pose.action
 ACTIONS = []
 ACTIONS.append(action("Idle", [
     (1 + i * 12, merge(spec_idle(), {"Chest": [("X", 3 * wave(i / 4))], "Head": [("Z", 5 * wave(i / 4 + 0.25))]}),
      (0, 0, -0.012 * (1 + wave(i / 4)) / 2), 0, 0) for i in range(4)], loop=True))
 
 
-def walk(t):
-    s = wave(t)
-    return {"UpperLeg.L": [("X", -24 * s)], "LowerLeg.L": [("X", 38 * max(0.0, -wave(t + 0.18)))],
-            "UpperLeg.R": [("X", 24 * s)], "LowerLeg.R": [("X", 38 * max(0.0, wave(t + 0.18)))],
-            "Foot.L": [("X", 10 * s)], "Foot.R": [("X", -10 * s)],
-            "Hips": [("Z", 6 * s)], "Chest": [("Z", -8 * s)], "Head": [("Z", 5 * s)]}
-
-
 def walk_spec(t):
-    s = merge(spec_idle(), walk(t))
+    s = merge(spec_idle(), walk_legs(t))
     s["UpperArm.R"] = [("IK", (-0.27, 0.12 - 0.14 * wave(t), 0.93 + 0.03 * abs(wave(t))), (-0.6, 1, 0))]
     return s
 
@@ -648,56 +468,16 @@ ACTIONS.append(action("Death", [
 rig.animation_data.action = ACTIONS[0]
 
 # ---------------------------------------------------------------- сохранение и экспорт
-os.makedirs(os.path.dirname(BLEND), exist_ok=True)
-bpy.ops.wm.save_as_mainfile(filepath=BLEND, compress=True)
-if os.path.exists(BLEND + "1"):
-    os.remove(BLEND + "1")
-
-bpy.ops.object.select_all(action="DESELECT")
-for o in [body, rig] + gear:
-    o.select_set(True)
-bpy.context.view_layer.objects.active = rig
+save_blend(BLEND)
 fbx = os.path.join(OUT_DIR, "SkeletonArcher.fbx")
-bpy.ops.export_scene.fbx(
-    filepath=fbx, use_selection=True, object_types={"ARMATURE", "MESH"},
-    apply_scale_options="FBX_SCALE_UNITS", axis_forward="-Z", axis_up="Y", bake_space_transform=True,
-    add_leaf_bones=False, mesh_smooth_type="FACE", path_mode="STRIP",
-    bake_anim=True, bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False,
-    bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0)
+export_fbx(fbx, [body] + gear, rig)
 print(f"[Archer] анимации: {[a.name for a in ACTIONS]}")
 print(f"[Archer] FBX: {fbx}")
 
 # ---------------------------------------------------------------- превью
 if PREVIEW:
     os.makedirs(PREVIEW, exist_ok=True)
-    scene.render.engine = "BLENDER_EEVEE"
-    scene.render.resolution_x, scene.render.resolution_y = 360, 480
-    world = bpy.data.worlds.new("Night")
-    world.use_nodes = True
-    world.node_tree.nodes["Background"].inputs[0].default_value = (0.05, 0.03, 0.12, 1)
-    world.node_tree.nodes["Background"].inputs[1].default_value = 0.6
-    scene.world = world
-    for name, energy, col, pos in (("Key", 900, (0.85, 0.8, 1.0), (1.5, -2.5, 2.6)),
-                                   ("Rim", 600, (0.4, 0.5, 1.0), (-2, 2, 2.2)),
-                                   ("Fill", 160, (1.0, 0.8, 0.6), (-2, -2, 0.6))):
-        ld = bpy.data.lights.new(name, "POINT")
-        ld.energy, ld.color = energy, col
-        lo = bpy.data.objects.new(name, ld)
-        lo.location = pos
-        scene.collection.objects.link(lo)
-    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
-    cam.data.lens = 50
-    scene.collection.objects.link(cam)
-    scene.camera = cam
-
-    def shot(path, angle_deg, frame=1, dist=3.6, height=1.1, target_z=0.9):
-        a = math.radians(angle_deg)
-        cam.location = (math.sin(a) * dist, -math.cos(a) * dist, height)
-        cam.rotation_euler = (Vector((0, 0, target_z)) - cam.location).to_track_quat("-Z", "Y").to_euler()
-        scene.frame_set(frame)
-        scene.render.filepath = path
-        bpy.ops.render.render(write_still=True)
-
+    shot = preview_stage(scene)
     for ang in (0, 40, 140):
         shot(os.path.join(PREVIEW, f"view_{ang}.png"), ang)
     for act, frames, ang in ((ACTIONS[2], (1, 8, 14, 20, 26, 36), 50), (ACTIONS[3], (1, 3, 6, 12, 24), 50),

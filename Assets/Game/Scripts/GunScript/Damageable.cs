@@ -13,8 +13,14 @@ public class Damageable : MonoBehaviour, IDamageable
     public Color flashColor = Color.red;
     public float flashTime = 0.08f;
 
+    // Доля урона, которая проходит (щит в блоке -- меньше 1, парирование -- 0)
+    [HideInInspector] public float damageMultiplier = 1f;
+
     public float Health { get; private set; }
     public bool IsDead => Health <= 0f;
+
+    // Вызывается при каждом попадании (урон до множителя) -- например, чтобы щит дрогнул от удара
+    public event System.Action<float> Damaged;
 
     // Вызывается один раз при смерти (до удаления) -- например, чтобы враг проиграл анимацию смерти
     public event System.Action Died;
@@ -36,6 +42,9 @@ public class Damageable : MonoBehaviour, IDamageable
     {
         if (IsDead) return;
 
+        Damaged?.Invoke(amount);
+        amount *= damageMultiplier;
+        if (amount <= 0f) return;
         Health -= amount;
         flashTimer = flashTime;
         SetFlash(true);
