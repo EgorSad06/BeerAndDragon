@@ -8,6 +8,7 @@ art/weapons/BowQuiver/bow_quiver.fbx (один меш: лук, обмотка, �
   art/enemies/skeleton_archer.blend
   Assets/Game/Assets/enemies/SkeletonArcher/SkeletonArcher.fbx   -- риг Generic (кости лука и стрелы анимированы),
                                                                   анимации Idle, Walk, Draw, Shoot, Death
+  Assets/Game/Assets/enemies/SkeletonArcher/Arrow.fbx       -- летящая стрела (SkeletonArrow), наконечник по +Z
   Assets/Game/Assets/enemies/SkeletonArcher/Textures/*.png
 
 Как устроено натяжение (в Unity работает без кода -- всё запечено в кости при экспорте FBX):
@@ -28,8 +29,8 @@ import bpy
 from mathutils import Matrix, Quaternion, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from skeleton_common import (Pose, export_fbx, fists, material, merge, preview_stage, save_blend, tex,  # noqa: E402
-                             walk_legs, wave)
+from skeleton_common import (Pose, export_fbx, export_static_fbx, fists, material, merge, preview_stage,  # noqa: E402
+                             save_blend, tex, walk_legs, wave)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC_BLEND = os.path.join(ROOT, "art", "enemies", "skeleton.blend")
@@ -338,8 +339,10 @@ def arrow_place(p):
     return R_FINGERS + a_rot @ ((p - a_nock_m) * a_scale)
 
 
-arrow = build_mesh("Arrow", [(a_isl, arrow_mat(a_nock_m, a_tip_m))] +
-                   [(isl, lambda c: "feather") for isl in parts["arrow_fletch"]], arrow_place, ratio=0.4)
+arrow_chunks = [(a_isl, arrow_mat(a_nock_m, a_tip_m))] + [(isl, lambda c: "feather") for isl in parts["arrow_fletch"]]
+arrow = build_mesh("Arrow", arrow_chunks, arrow_place, ratio=0.4)
+# летящая стрела для игры -- отдельная модель Arrow.fbx: хвост в начале координат, наконечник по -Y (в Unity -- +Z)
+projectile = build_mesh("ArrowProjectile", arrow_chunks, lambda p: a_rot @ ((p - a_nock_m) * a_scale), ratio=0.4)
 bpy.data.objects.remove(src)
 
 # ---------------------------------------------------------------- кости лука и стрелы, привязка мешей
@@ -471,6 +474,8 @@ rig.animation_data.action = ACTIONS[0]
 save_blend(BLEND)
 fbx = os.path.join(OUT_DIR, "SkeletonArcher.fbx")
 export_fbx(fbx, [body] + gear, rig)
+export_static_fbx(os.path.join(OUT_DIR, "Arrow.fbx"), projectile)
+projectile.hide_render = True
 print(f"[Archer] анимации: {[a.name for a in ACTIONS]}")
 print(f"[Archer] FBX: {fbx}")
 

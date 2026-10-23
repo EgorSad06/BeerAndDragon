@@ -239,6 +239,17 @@ def export_fbx(path, objects, rig):
         bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0)
 
 
+def export_static_fbx(path, obj):
+    """Один меш без рига и анимаций (снаряд): начало координат объекта -- начало координат модели."""
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.export_scene.fbx(
+        filepath=path, use_selection=True, object_types={"MESH"},
+        apply_scale_options="FBX_SCALE_UNITS", axis_forward="-Z", axis_up="Y", bake_space_transform=True,
+        mesh_smooth_type="FACE", path_mode="STRIP", bake_anim=False)
+
+
 def preview_stage(scene):
     """Ночной фон, три лампы, камера; возвращает shot(путь, угол, кадр, ...)."""
     scene.render.engine = "BLENDER_EEVEE"

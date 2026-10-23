@@ -62,21 +62,24 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1957415100753638122}
+      addedObject: {fileID: 2806743510463333107}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
       insertIndex: -1
       addedObject: {fileID: 481069738691465381}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3175136396403871344}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7219080540383324316}
   m_SourcePrefab: {fileID: 100100000, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
 --- !u!1 &1827637905079870207 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 0506707e3fe418f4f919665558fa8fa4, type: 3}
   m_PrefabInstance: {fileID: 1557255000782938030}
   m_PrefabAsset: {fileID: 0}
---- !u!136 &1957415100753638122
-CapsuleCollider:
+--- !u!143 &2806743510463333107
+CharacterController:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -90,13 +93,15 @@ CapsuleCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.3
+  serializedVersion: 3
   m_Height: 1.8
-  m_Direction: 1
+  m_Radius: 0.3
+  m_SlopeLimit: 45
+  m_StepOffset: 0.35
+  m_SkinWidth: 0.08
+  m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!114 &481069738691465381
 MonoBehaviour:
@@ -134,3 +139,37 @@ MonoBehaviour:
   shieldPaint: -1
   blockedDamage: 0.2
   parryTime: 0.35
+--- !u!114 &7219080540383324316
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1827637905079870207}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 234987ac45565244786447f757736872, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkeletonAI
+  role: 2
+  sightRange: 16
+  loseRange: 26
+  eyeHeight: 1.6
+  walkSpeed: 1.2
+  turnSpeed: 300
+  personalSpace: 0.9
+  attackRange: 1.6
+  hitReach: 2.1
+  hitAngle: 70
+  damage: 12
+  attackCooldown: 1
+  threatRange: 3.5
+  parryChance: 0.35
+  blockOnHitChance: 0.5
+  blockHold: 0.8
+  arrowPrefab: {fileID: 6982413755021817279, guid: f73a9778d03b5304ab589d143a208d1f, type: 3}
+  minRange: 5
+  maxRange: 14
+  arrowSpeed: 28
+  arrowDamage: 10
+  shootCooldown: 1.2

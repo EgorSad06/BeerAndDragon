@@ -9,6 +9,7 @@ using UnityEngine;
 //    натянуть и выстрелить; в момент выстрела -- событие ArrowReleased), Die -- смерть;
 //  - щит (у щитовика -- объект Shield): раскраска из shieldPaints (заданная или случайная); SetBlocking -- поднять щит
 //    (проходит blockedDamage урона, удар по щиту -- анимация BlockHit), Parry -- отбив (parryTime с начала урон 0);
+//  - события анимаций: AttackHit (удар достал), ArrowReleased (стрела выпущена) -- их слушает SkeletonAI;
 //  - смерть по Damageable: проигрывается анимация, коллайдеры выключаются, тело удаляет Damageable (destroyDelay).
 [RequireComponent(typeof(Animator))]
 public class SkeletonCreep : MonoBehaviour
@@ -42,11 +43,14 @@ public class SkeletonCreep : MonoBehaviour
 
     // Лучник отпустил тетиву (событие анимации Shoot) -- здесь появится летящая стрела
     public event System.Action ArrowReleased;
+    // Удар оружием дошёл до цели (событие анимации Attack) -- здесь наносится урон
+    public event System.Action AttackHit;
 
     public string CurrentWeapon { get; private set; }
     public bool IsDead { get; private set; }
     public bool HasShield => shield != null;
     public bool IsBlocking { get; private set; }
+    public bool IsParrying => Time.time < parryUntil;
 
     public IEnumerable<string> WeaponNames
     {
@@ -139,10 +143,24 @@ public class SkeletonCreep : MonoBehaviour
         if (!IsDead) animator.SetTrigger(AttackId);
     }
 
+    // Длина клипа контроллера (сколько займёт атака), 0 -- нет такого
+    public float ClipLength(string clipName)
+    {
+        foreach (AnimationClip c in animator.runtimeAnimatorController.animationClips)
+            if (c.name == clipName) return c.length;
+        return 0f;
+    }
+
     // Вызывается событием анимации Shoot
     private void OnArrowRelease()
     {
         ArrowReleased?.Invoke();
+    }
+
+    // Вызывается событием анимации Attack
+    private void OnAttackHit()
+    {
+        if (!IsDead) AttackHit?.Invoke();
     }
 
     private void OnDied()

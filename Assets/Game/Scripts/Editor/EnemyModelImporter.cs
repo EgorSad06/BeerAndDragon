@@ -9,7 +9,8 @@ using UnityEngine.Rendering;
 //    Humanoid не импортирует анимацию дополнительных костей, а у лучника это тетива и стрела;
 //  - клипы получают короткие имена: "Rig|Rig|Walk" -> "Walk"; Idle, Walk и Block зациклены; движение корня (наклон и
 //    опускание таза в Death, шаг в Attack) запечено в позу -- враг двигается скриптом, root motion не нужен;
-//  - в Shoot (лучник) -- событие OnArrowRelease на кадре, где отпущена тетива (SkeletonCreep.ArrowReleased);
+//  - события: в Shoot (лучник) -- OnArrowRelease на кадре, где отпущена тетива; в Attack -- OnAttackHit на кадре
+//    удара (SkeletonCreep.ArrowReleased / AttackHit); модели из StaticModels (стрела) -- без рига;
 //  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
 //    если есть Textures/<материал>_Emission.png -- это карта свечения (синие глаза на текстуре скелета);
 //  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у ореола края не повторяются (Clamp).
@@ -19,6 +20,8 @@ public class EnemyModelImporter : AssetPostprocessor
     private static readonly string[] Looped = { "Idle", "Walk", "Block" };
     private static readonly string[] GenericModels = { "SkeletonArcher" };
     private const float ShootReleaseFrame = 2f;   // от начала клипа Shoot (tools/blender/skeleton_archer.py)
+    private const float AttackHitFrame = 14f;     // от начала клипа Attack: удар проходит перед скелетом
+    private static readonly string[] StaticModels = { "Arrow" };   // без рига и анимаций (снаряды)
 
     private bool IsEnemyAsset => assetPath.Replace('\\', '/').StartsWith(Folder);
 
@@ -26,7 +29,16 @@ public class EnemyModelImporter : AssetPostprocessor
     {
         if (!IsEnemyAsset) return;
         ModelImporter m = (ModelImporter)assetImporter;
-        bool generic = GenericModels.Contains(Path.GetFileNameWithoutExtension(assetPath));
+        string name = Path.GetFileNameWithoutExtension(assetPath);
+        if (StaticModels.Contains(name))
+        {
+            m.animationType = ModelImporterAnimationType.None;
+            m.importAnimation = false;
+            m.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+            m.materialLocation = ModelImporterMaterialLocation.External;
+            return;
+        }
+        bool generic = GenericModels.Contains(name);
         m.animationType = generic ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.Human;
         m.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
         m.importAnimation = true;
@@ -46,15 +58,14 @@ public class EnemyModelImporter : AssetPostprocessor
             c.loopTime = Looped.Contains(c.name);
             c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = true;
             c.keepOriginalOrientation = c.keepOriginalPositionY = c.keepOriginalPositionXZ = true;
-            if (c.name == "Shoot")
-                c.events = new[] { new AnimationEvent
-                {
-                    functionName = "OnArrowRelease",
-                    time = ShootReleaseFrame / (c.lastFrame - c.firstFrame),
-                } };
+            if (c.name == "Shoot") c.events = new[] { Event("OnArrowRelease", ShootReleaseFrame, c) };
+            if (c.name == "Attack") c.events = new[] { Event("OnAttackHit", AttackHitFrame, c) };
         }
         m.clipAnimations = clips;
     }
+
+    private static AnimationEvent Event(string function, float frame, ModelImporterClipAnimation c) =>
+        new AnimationEvent { functionName = function, time = frame / (c.lastFrame - c.firstFrame) };
 
     // FBX не переносит в URP свечение и прозрачность -- задаём здесь
     void OnPostprocessMaterial(Material material)

@@ -7,7 +7,8 @@ using UnityEngine;
 //  - <модель>.controller: Idle <-> Walk по Speed; по триггеру Attack (из Idle и Walk) -- цепочка атаки
 //    (крип и щитовик: Attack; лучник: Draw -> Shoot), потом Idle; Death по триггеру Die отовсюду;
 //    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту в блоке), Parry (из Idle, Walk, Block);
-//  - префаб: модель + Animator + SkeletonCreep + Damageable + CapsuleCollider;
+//  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonAI (своя роль);
+//  - у лучника -- префаб летящей стрелы SkeletonArrow.prefab (модель Arrow.fbx) в SkeletonAI.arrowPrefab;
 //  - у щитовика -- материалы раскрасок SKS_Paint1..8 (копии SKS_Paint1 со своей текстурой) в SkeletonCreep.shieldPaints.
 // Запуск: меню Tools/BeerAndDragon/Build Skeleton Enemies (или -executeMethod SkeletonCreepBuilder.Build).
 public static class SkeletonCreepBuilder
@@ -20,16 +21,17 @@ public static class SkeletonCreepBuilder
         public string[] AttackChain;
         public float Health;
         public bool Shield;
+        public SkeletonAI.Role Role;
     }
 
     private static readonly Variant[] Variants =
     {
         new Variant { Folder = "Skeleton", Model = "Skeleton", Prefab = "SkeletonCreep",
-                      AttackChain = new[] { "Attack" }, Health = 60f },
+                      AttackChain = new[] { "Attack" }, Health = 60f, Role = SkeletonAI.Role.Melee },
         new Variant { Folder = "SkeletonArcher", Model = "SkeletonArcher", Prefab = "SkeletonArcher",
-                      AttackChain = new[] { "Draw", "Shoot" }, Health = 40f },
+                      AttackChain = new[] { "Draw", "Shoot" }, Health = 40f, Role = SkeletonAI.Role.Archer },
         new Variant { Folder = "SkeletonShield", Model = "SkeletonShield", Prefab = "SkeletonShield",
-                      AttackChain = new[] { "Attack" }, Health = 80f, Shield = true },
+                      AttackChain = new[] { "Attack" }, Health = 80f, Shield = true, Role = SkeletonAI.Role.Shield },
     };
 
     [MenuItem("Tools/BeerAndDragon/Build Skeleton Enemies")]
@@ -54,10 +56,11 @@ public static class SkeletonCreepBuilder
         animator.applyRootMotion = false;
         animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
 
-        CapsuleCollider capsule = go.AddComponent<CapsuleCollider>();
-        capsule.center = new Vector3(0f, 0.9f, 0f);
-        capsule.height = 1.8f;
-        capsule.radius = 0.3f;
+        CharacterController body = go.AddComponent<CharacterController>();   // и коллайдер для попаданий
+        body.center = new Vector3(0f, 0.9f, 0f);
+        body.height = 1.8f;
+        body.radius = 0.3f;
+        body.stepOffset = 0.35f;
 
         Damageable health = go.AddComponent<Damageable>();
         health.maxHealth = v.Health;
@@ -67,9 +70,48 @@ public static class SkeletonCreepBuilder
         SkeletonCreep creep = go.AddComponent<SkeletonCreep>();
         if (v.Shield) creep.shieldPaints = BuildShieldPaints(dir);
 
+        SkeletonAI ai = go.AddComponent<SkeletonAI>();
+        ai.role = v.Role;
+        if (v.Role == SkeletonAI.Role.Shield) ai.walkSpeed = 1.0f;
+        if (v.Role == SkeletonAI.Role.Archer) ai.arrowPrefab = BuildArrowPrefab(dir);
+
         PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
         Object.DestroyImmediate(go);
         Debug.Log($"[SkeletonCreep] {prefabPath}");
+    }
+
+    private static SkeletonArrow BuildArrowPrefab(string dir)
+    {
+        GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>($"{dir}/Arrow.fbx");
+        GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(model);
+        go.name = "SkeletonArrow";
+        go.AddComponent<SkeletonArrow>();
+        foreach (Renderer r in go.GetComponentsInChildren<Renderer>())
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{dir}/SkeletonArrow.prefab");
+        Object.DestroyImmediate(go);
+        return prefab.GetComponent<SkeletonArrow>();
+    }
+
+    // Расставить по скелету каждого вида перед игроком в открытой сцене (для проверки; сцену сохраняешь сам)
+    [MenuItem("Tools/BeerAndDragon/Spawn Skeletons Near Player")]
+    public static void SpawnNearPlayer()
+    {
+        PlayerHealth player = Object.FindFirstObjectByType<PlayerHealth>();
+        Transform p = player != null ? player.transform : null;
+        Vector3 origin = p != null ? p.position : Vector3.zero;
+        Vector3 fwd = p != null ? Vector3.ProjectOnPlane(p.forward, Vector3.up).normalized : Vector3.forward;
+        Vector3 right = Vector3.Cross(Vector3.up, fwd);
+        for (int i = 0; i < Variants.Length; i++)
+        {
+            Variant v = Variants[i];
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{Root}{v.Folder}/{v.Prefab}.prefab");
+            GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            go.transform.position = origin + fwd * (v.Role == SkeletonAI.Role.Archer ? 14f : 9f) + right * (i - 1) * 2.5f;
+            go.transform.rotation = Quaternion.LookRotation(-fwd);
+            Undo.RegisterCreatedObjectUndo(go, "Spawn Skeletons");
+        }
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
     }
 
     // SKS_Paint1 импортирован из FBX; остальные раскраски -- его копии с текстурами Textures/SKS_Paint<n>.png
