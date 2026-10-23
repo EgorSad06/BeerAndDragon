@@ -8267,9 +8267,10 @@ MonoBehaviour:
   impactPrefab: {fileID: 0}
   impactLifetime: 1
   audioSource: {fileID: 1404427457}
-  fireSound: {fileID: 0}
-  reloadSound: {fileID: 0}
-  emptySound: {fileID: 0}
+  fireSound: {fileID: 8300000, guid: 49af671a68e4a9648b4ec83cb4bdedd0, type: 3}
+  fireVolume: 0.8
+  reloadSound: {fileID: 8300000, guid: 8ab0da747ef035e44984b441bee9a865, type: 3}
+  emptySound: {fileID: 8300000, guid: 9e020c0428159fe4496fb4790161fa6e, type: 3}
   bulletHolePrefab: {fileID: 3382990519121783343, guid: 4ebf58f3e91f5e9478d3857421e58d59, type: 3}
   flipDecalNormal: 1
   decalOffset: 0.01

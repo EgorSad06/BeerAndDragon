@@ -120,7 +120,9 @@ public class Weapon : MonoBehaviour
     public float impactLifetime = 1f;
     public AudioSource audioSource;
     public AudioClip fireSound;             // не назначен -- выстрел генерируется в коде (WeaponSounds)
-    public AudioClip reloadSound;           // не назначен -- перезарядка генерируется в коде (WeaponSounds)
+    [Range(0f, 1f)] public float fireVolume = 0.8f;   // выстрел чуть тише записи
+    public AudioClip reloadSound;           // вставка одного патрона: звучит на каждый патрон; не назначен --
+                                            // вся перезарядка одним сгенерированным звуком (WeaponSounds)
     public AudioClip emptySound;            // не назначен -- щелчок генерируется в коде (FR-WPN-03.1)
 
     [Header("Bullet holes (decals)")]
@@ -478,7 +480,26 @@ public class Weapon : MonoBehaviour
         if (!Ammo.TryStartReload(Time.time)) return;
         if (animator != null)
             animator.SetTrigger(reloadTrigger);
-        PlayReloadSound();
+        if (reloadSound != null && !reloadOneByOne) StartCoroutine(ShellSoundsRoutine(ShellsToLoad()));
+        else PlayReloadSound();
+    }
+
+    // Сколько патронов войдёт за эту перезарядку (до её завершения)
+    private int ShellsToLoad()
+    {
+        int room = Ammo.MagazineSize - Ammo.Magazine;
+        return Mathf.Max(1, Ammo.InfiniteReserve ? room : Mathf.Min(room, Ammo.Reserve));
+    }
+
+    // Обычная перезарядка (все патроны разом): звук вставки на каждый патрон, равномерно за reloadTime
+    private IEnumerator ShellSoundsRoutine(int shells)
+    {
+        float step = reloadTime / shells;
+        for (int i = 0; i < shells && Ammo.IsReloading; i++)
+        {
+            PlayReloadSound();
+            yield return new WaitForSeconds(step);
+        }
     }
 
     private void TickReload()
@@ -517,7 +538,7 @@ public class Weapon : MonoBehaviour
         // Звук не назначен -- сгенерированный (WeaponSounds), в batchmode без звука
         AudioClip shot = fireSound != null ? fireSound : (Application.isBatchMode ? null : WeaponSounds.RandomShot());
         if (audioSource != null && shot != null)
-            audioSource.PlayOneShot(shot);
+            audioSource.PlayOneShot(shot, fireVolume);
 
         if (muzzleFlashPrefab != null && muzzlePoint != null)
         {

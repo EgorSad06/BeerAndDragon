@@ -17,6 +17,7 @@ public static class WeaponSetupTool
     const string ShotgunTex = ShotgunDir + "/Files/DoubleBarrelShotgun/Textures/DBShotgunText.png";
     const string ShellTex = ShotgunDir + "/Files/DoubleBarrelShotgun/Textures/shotgunShellTexture.jpg";
     const string BulletHoleTex = "Assets/Game/Assets/guns/tuff/bullet_holl.png";
+    const string ShotgunSounds = "Assets/Game/Assets/Sounds/Shotgun/";
 
     const string CigDir = "Assets/Game/Assets/things/PSXCigarette Pack[FIXED]";
     const string CigPackFbx = CigDir + "/CigarettePack/CigarettePacks/PackCigarettesStandard.fbx";
@@ -250,6 +251,10 @@ public static class WeaponSetupTool
         w.muzzleFlashPrefab = G.MuzzleFlashPrefab();
         w.muzzleFlashLifetime = 0.05f;
         w.audioSource = audio;
+        w.fireSound = AssetDatabase.LoadAssetAtPath<AudioClip>(ShotgunSounds + "shotgun_fire.ogg");
+        w.fireVolume = 0.8f;
+        w.reloadSound = AssetDatabase.LoadAssetAtPath<AudioClip>(ShotgunSounds + "shotgun_shell_insert.wav");
+        w.emptySound = AssetDatabase.LoadAssetAtPath<AudioClip>(ShotgunSounds + "shotgun_empty.wav");
         w.bulletHolePrefab = G.BulletHolePrefab(AssetDatabase.LoadAssetAtPath<Texture2D>(BulletHoleTex));
         w.flipDecalNormal = true; // у Quad лицевая сторона смотрит в -Z
         w.decalOffset = 0.01f;
