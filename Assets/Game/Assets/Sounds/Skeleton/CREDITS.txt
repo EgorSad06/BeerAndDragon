@@ -1,0 +1,10 @@
+Звуки скелетов. Все записи с freesound.org, лицензия Creative Commons 0 (CC0) -- указывать авторство не обязательно.
+
+bones_crack_1..6.wav   -- vlatkoblazek, "bones breaking" (189736), нарезано на 6 хрустов
+skeleton_swing_1..4.wav -- PorkMuncher, "swoosh.wav" (263595), нарезано на 4 взмаха
+skeleton_swing_5.mp3   -- XxChr0nosxX, "Swing.mp3" (268227)
+skeleton_swing_6.mp3   -- GaussTheWizard, "swing.mp3" (367182)
+skeleton_swing_7.aiff  -- Danjocross, "Clean fast Swoosh.aiff" (507466)
+skeleton_draw_1.ogg    -- Paveroux, "Bow Drawn" (490556)
+skeleton_bow_1.wav     -- saturdaysoundguy, "Longbow Release 2.wav" (394179)
+skeleton_bow_2.wav     -- Ali_6868, "Bow Release (Bow and Arrow) 4" (384917), обрезано

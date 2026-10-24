@@ -10,7 +10,8 @@ using UnityEngine.Rendering.Universal;
 //  - во все рендереры URP (PC_Renderer, Mobile_Renderer) ставятся фичи Retro FX Lite (REEBOO, Assets/REEBOO --
 //    пикселизация) и RetroColorFeature (свой: уровни цвета + дизеринг), в этом порядке;
 //  - настройки -- в профиль по умолчанию URP (Assets/Game/Settings/DefaultVolumeProfile), значит, во всех сценах:
-//    Intensity 1, Pixel Resolution 240, Colour Levels 32, Dither 0.55; сканлайны и кривизна экрана выключены.
+//    Intensity 1, Pixel Resolution 240, Colour Levels 32, Dither 0.55; сканлайны и кривизна экрана выключены;
+//    дымка: серо-лиловая, с 6 до 45 м, вдали 85%, 8 ступеней.
 // PSX-шейдеры поверхностей (дрожание вершин, аффинные текстуры) не ставятся -- материалы остаются свои.
 public static class RetroLookSetupTool
 {
@@ -37,6 +38,11 @@ public static class RetroLookSetupTool
         colour.colourLevels.Override(32);
         colour.dither.Override(0.55f);
         colour.pixelResolution.Override(PixelResolution);
+        colour.fogMax.Override(0.85f);
+        colour.fogColor.Override(new Color(0.42f, 0.4f, 0.46f));
+        colour.fogStart.Override(6f);
+        colour.fogEnd.Override(45f);
+        colour.fogSteps.Override(8);
         EditorUtility.SetDirty(screen);
         EditorUtility.SetDirty(colour);
         EditorUtility.SetDirty(profile);

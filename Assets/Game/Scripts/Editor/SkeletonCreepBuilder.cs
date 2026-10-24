@@ -11,7 +11,7 @@ using UnityEngine;
 //    выстрелить; состояния с тегом Attack); Hit -- вздрогнуть; Fidget -- почесаться; Die -- смерть DeathIndex;
 //    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту), Parry (свой клип из SkeletonShield.fbx);
 //  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonDeath (смерть --
-//    рассыпаться на кости или рэгдолл) + SkeletonSounds (хруст костей, свист удара, тетива -- Sounds/Skeleton)
+//    рассыпаться на кости или рэгдолл) + SkeletonSounds (хруст костей, свист удара, скрип и щелчок тетивы -- Sounds/Skeleton)
 //    + SkeletonAI (роль, скорости
 //    шагов из анимаций); лучнику -- BowRig (тетива, стрела) и SkeletonArrow.prefab; щитовику -- раскраски щита;
 //  - лук и щит поворачиваются в руке так, чтобы в позах Mixamo лук стоял вертикально тетивой к правой руке
@@ -117,7 +117,10 @@ public static class SkeletonCreepBuilder
         SkeletonSounds sounds = go.AddComponent<SkeletonSounds>();
         sounds.boneCracks = LoadSounds("bones_crack_");
         sounds.swings = LoadSounds("skeleton_swing_");
-        sounds.bowShots = v.Role == SkeletonAI.Role.Archer ? LoadSounds("skeleton_bow_") : new AudioClip[0];
+        bool archer = v.Role == SkeletonAI.Role.Archer;
+        sounds.swings = archer ? new AudioClip[0] : sounds.swings;
+        sounds.bowShots = archer ? LoadSounds("skeleton_bow_") : new AudioClip[0];
+        sounds.bowDraws = archer ? LoadSounds("skeleton_draw_") : new AudioClip[0];
 
         SkeletonAI ai = go.AddComponent<SkeletonAI>();
         ai.role = v.Role;

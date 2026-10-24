@@ -1,10 +1,13 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-// Звуки скелета (клипы -- Assets/Game/Assets/Sounds/Skeleton, назначает SkeletonCreepBuilder):
+// Звуки скелета (клипы -- Assets/Game/Assets/Sounds/Skeleton, назначает SkeletonCreepBuilder; источники -- CREDITS.txt там же):
 //  - живой скелет раз в rattleInterval секунд тихо хрустит костями (boneCracks, со случайной высотой);
-//  - удар оружием -- свист (swings): начинается за swingLead до кадра удара (SkeletonCreep.AttackStarted);
-//  - выстрел лучника -- щелчок тетивы (bowShots, SkeletonCreep.ArrowReleased);
+//  - удар оружием -- свист (swings): запускается так, чтобы самое громкое место записи пришлось на кадр удара
+//    (SkeletonCreep.AttackStarted);
+//  - лучник натягивает тетиву -- скрип (bowDraws, событие анимации OnArrowNock), выстрел -- тетива (bowShots,
+//    SkeletonCreep.ArrowReleased);
 //  - смерть -- громкий хруст костей.
 // Звук объёмный (3D): AudioSource на скелете, слышно в пределах maxDistance.
 [RequireComponent(typeof(SkeletonCreep))]
@@ -13,21 +16,24 @@ public class SkeletonSounds : MonoBehaviour
     public AudioClip[] boneCracks = new AudioClip[0];
     public AudioClip[] swings = new AudioClip[0];
     public AudioClip[] bowShots = new AudioClip[0];
+    public AudioClip[] bowDraws = new AudioClip[0];
 
     [Tooltip("Пауза между тихими хрустами (с): от и до")]
     public Vector2 rattleInterval = new Vector2(5f, 14f);
     [Range(0f, 1f)] public float rattleVolume = 0.25f;
     [Range(0f, 1f)] public float swingVolume = 0.8f;
     [Range(0f, 1f)] public float bowVolume = 0.7f;
+    [Range(0f, 1f)] public float drawVolume = 0.6f;
     [Range(0f, 1f)] public float deathVolume = 0.9f;
-    [Tooltip("За сколько секунд до кадра удара начинается свист (громче всего он примерно через 0.25 с)")]
-    public float swingLead = 0.3f;
     public float maxDistance = 25f;
 
     private SkeletonCreep creep;
     private Damageable health;
     private AudioSource source;
     private float nextRattle;
+
+    // где в клипе самое громкое место (с) -- на него ставится кадр удара
+    private static readonly Dictionary<AudioClip, float> Peaks = new Dictionary<AudioClip, float>();
 
     void Awake()
     {
@@ -73,13 +79,39 @@ public class SkeletonSounds : MonoBehaviour
     // hitTime -- через сколько секунд удар достанет цель; меньше 0 -- в атаке нет удара (лучник)
     private void OnAttackStarted(float hitTime)
     {
-        if (hitTime >= 0f && swings.Length > 0) StartCoroutine(SwingAfter(Mathf.Max(0f, hitTime - swingLead)));
+        if (hitTime < 0f || swings.Length == 0) return;
+        AudioClip clip = swings[Random.Range(0, swings.Length)];
+        if (clip != null) StartCoroutine(SwingAfter(clip, Mathf.Max(0f, hitTime - Peak(clip))));
     }
 
-    private IEnumerator SwingAfter(float delay)
+    private IEnumerator SwingAfter(AudioClip clip, float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (!creep.IsDead) Play(swings, swingVolume, Random.Range(0.9f, 1.1f));
+        if (creep.IsDead) yield break;
+        source.pitch = Random.Range(0.9f, 1.1f);
+        source.PlayOneShot(clip, swingVolume);
+    }
+
+    // Вызывается событием анимации натягивания (archer_draw): стрела на тетиве, тянем
+    private void OnArrowNock()
+    {
+        if (!creep.IsDead) Play(bowDraws, drawVolume, Random.Range(0.95f, 1.05f));
+    }
+
+    private static float Peak(AudioClip clip)
+    {
+        if (Peaks.TryGetValue(clip, out float t)) return t;
+        t = clip.length * 0.5f;
+        var data = new float[clip.samples * clip.channels];
+        if (clip.loadState == AudioDataLoadState.Loaded && clip.GetData(data, 0))
+        {
+            int best = 0;
+            for (int i = 1; i < data.Length; i++)
+                if (Mathf.Abs(data[i]) > Mathf.Abs(data[best])) best = i;
+            t = best / clip.channels / (float)clip.frequency;
+        }
+        Peaks[clip] = t;
+        return t;
     }
 
     private void OnArrowReleased()

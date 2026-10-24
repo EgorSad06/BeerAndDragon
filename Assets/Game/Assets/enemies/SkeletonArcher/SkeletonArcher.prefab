@@ -238,19 +238,18 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 0704a29c2a28f564197ee9c8b1f050d6, type: 3}
   - {fileID: 8300000, guid: 6d728e775ea427549ab6c2a180c6c8ad, type: 3}
   - {fileID: 8300000, guid: feab581fab3479a4d8683f5cbea7ab67, type: 3}
-  swings:
-  - {fileID: 8300000, guid: 72beabe75b3878649839b61faea3fe4c, type: 3}
-  - {fileID: 8300000, guid: fadca8eb03e585145adc192edc64232c, type: 3}
-  - {fileID: 8300000, guid: 110763da5bd1fe14c8b10360f951ac9b, type: 3}
+  swings: []
   bowShots:
   - {fileID: 8300000, guid: 24a8e312c928f8c4b81a1c2a34a9ed77, type: 3}
   - {fileID: 8300000, guid: ef9f11948b814474bb091ff66dad448b, type: 3}
+  bowDraws:
+  - {fileID: 8300000, guid: ecd978482d4604044afa559ee3de776f, type: 3}
   rattleInterval: {x: 5, y: 14}
   rattleVolume: 0.25
   swingVolume: 0.8
   bowVolume: 0.7
+  drawVolume: 0.6
   deathVolume: 0.9
-  swingLead: 0.3
   maxDistance: 25
 --- !u!114 &7219080540383324316
 MonoBehaviour:

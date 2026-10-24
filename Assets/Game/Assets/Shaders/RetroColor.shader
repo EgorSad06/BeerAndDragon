@@ -1,5 +1,6 @@
-// Цвет PS1 для RetroColorFeature: квантование до _RetroColorParams.x уровней на канал в sRGB
-// и дизеринг Байера 4x4 силой .y клетками по .z пикселей экрана.
+// Цвет PS1 для RetroColorFeature: дымка по глубине (_RetroFogParams: начало, конец, плотность вдали, ступени;
+// глубина берётся по сетке виртуального экрана .w строк -- края дымки совпадают с крупными пикселями),
+// затем квантование до _RetroColorParams.x уровней на канал в sRGB и дизеринг Байера 4x4 силой .y клетками по .z px.
 Shader "Hidden/BeerAndDragon/RetroColor"
 {
     SubShader
@@ -16,21 +17,38 @@ Shader "Hidden/BeerAndDragon/RetroColor"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
-            float4 _RetroColorParams; // levels, dither, cell size (px)
+            float4 _RetroColorParams; // levels, dither, cell size (px), virtual lines
+            float4 _RetroFogParams;   // start, end, max density, steps
+            float4 _RetroFogColor;
             static const float kBayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
 
             float4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float3 c = SAMPLE_TEXTURE2D_X_LOD(_BlitTexture, sampler_PointClamp, input.texcoord, 0).rgb;
+                int2 q = int2(fmod(floor(input.positionCS.xy / _RetroColorParams.z), 4.0));
+                float bayer = (kBayer[q.y * 4 + q.x] + 0.5) / 16.0 - 0.5;
+
+                if (_RetroFogParams.z > 0.0)
+                {
+                    float2 cells = float2(floor(_RetroColorParams.w * _ScreenParams.x / _ScreenParams.y + 0.5), _RetroColorParams.w);
+                    float2 uv = (floor(input.texcoord * cells) + 0.5) / cells;
+                    float dist = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
+                    float f = saturate((dist - _RetroFogParams.x) / (_RetroFogParams.y - _RetroFogParams.x));
+                    if (_RetroFogParams.w > 0.5) f = saturate(floor(f * _RetroFogParams.w + 0.5 + bayer) / _RetroFogParams.w);
+                    c = lerp(c, _RetroFogColor.rgb, f * _RetroFogParams.z);
+                }
+
             #if !defined(UNITY_COLORSPACE_GAMMA)
                 c = LinearToSRGB(saturate(c));
             #endif
-                float steps = max(_RetroColorParams.x - 1.0, 1.0);
-                int2 q = int2(fmod(floor(input.positionCS.xy / _RetroColorParams.z), 4.0));
-                float t = ((kBayer[q.y * 4 + q.x] + 0.5) / 16.0 - 0.5) * _RetroColorParams.y;
-                c = floor(saturate(c) * steps + 0.5 + t) / steps;
+                if (_RetroColorParams.x > 1.0)
+                {
+                    float steps = _RetroColorParams.x - 1.0;
+                    c = floor(saturate(c) * steps + 0.5 + bayer * _RetroColorParams.y) / steps;
+                }
             #if !defined(UNITY_COLORSPACE_GAMMA)
                 c = SRGBToLinear(saturate(c));
             #endif

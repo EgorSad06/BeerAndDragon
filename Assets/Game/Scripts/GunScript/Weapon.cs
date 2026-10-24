@@ -449,6 +449,7 @@ public class Weapon : MonoBehaviour
         if (bulletHolePrefab == null) return;
         if (((1 << hit.collider.gameObject.layer) & decalIgnoreLayers) != 0) return;
         if (hit.rigidbody != null) return; // на летающих ящиках дырки выглядят странно
+        if (hit.collider is CharacterController) return; // капсула врага -- не его тело: дырка повисла бы в воздухе
 
         bulletHoles?.Place(hit.point, hit.normal, Random.Range(0f, 360f), Time.time);
     }

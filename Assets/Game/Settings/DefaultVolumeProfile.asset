@@ -830,6 +830,21 @@ MonoBehaviour:
   pixelResolution:
     m_OverrideState: 1
     m_Value: 240
+  fogMax:
+    m_OverrideState: 1
+    m_Value: 0.85
+  fogColor:
+    m_OverrideState: 1
+    m_Value: {r: 0.42, g: 0.4, b: 0.46, a: 1}
+  fogStart:
+    m_OverrideState: 1
+    m_Value: 6
+  fogEnd:
+    m_OverrideState: 1
+    m_Value: 45
+  fogSteps:
+    m_OverrideState: 1
+    m_Value: 8
 --- !u!114 &3959858460715838825
 MonoBehaviour:
   m_ObjectHideFlags: 3
