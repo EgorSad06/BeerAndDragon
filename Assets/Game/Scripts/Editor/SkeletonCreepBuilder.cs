@@ -11,7 +11,8 @@ using UnityEngine;
 //    выстрелить; состояния с тегом Attack); Hit -- вздрогнуть; Fidget -- почесаться; Die -- смерть DeathIndex;
 //    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту), Parry (свой клип из SkeletonShield.fbx);
 //  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonDeath (смерть --
-//    рассыпаться на кости или рэгдолл) + SkeletonAI (роль, скорости
+//    рассыпаться на кости или рэгдолл) + SkeletonSounds (хруст костей, свист удара, тетива -- Sounds/Skeleton)
+//    + SkeletonAI (роль, скорости
 //    шагов из анимаций); лучнику -- BowRig (тетива, стрела) и SkeletonArrow.prefab; щитовику -- раскраски щита;
 //  - лук и щит поворачиваются в руке так, чтобы в позах Mixamo лук стоял вертикально тетивой к правой руке
 //    (прицел), а щит -- лицом вперёд (стойка, ходьба, блок -- в среднем); кости-метки BowTop/BowString,
@@ -20,6 +21,7 @@ using UnityEngine;
 public static class SkeletonCreepBuilder
 {
     private const string Root = "Assets/Game/Assets/enemies/";
+    private const string Sounds = "Assets/Game/Assets/Sounds/Skeleton/";
 
     private class Variant
     {
@@ -112,6 +114,10 @@ public static class SkeletonCreepBuilder
         }
 
         go.AddComponent<SkeletonDeath>();   // смерть: рассыпается на кости
+        SkeletonSounds sounds = go.AddComponent<SkeletonSounds>();
+        sounds.boneCracks = LoadSounds("bones_crack_");
+        sounds.swings = LoadSounds("skeleton_swing_");
+        sounds.bowShots = v.Role == SkeletonAI.Role.Archer ? LoadSounds("skeleton_bow_") : new AudioClip[0];
 
         SkeletonAI ai = go.AddComponent<SkeletonAI>();
         ai.role = v.Role;
@@ -187,6 +193,15 @@ public static class SkeletonCreepBuilder
             kv.Key.localScale = kv.Value.localScale;
         }
     }
+
+    // Звуки Sounds/Skeleton/<prefix>1, 2, ... по порядку
+    private static AudioClip[] LoadSounds(string prefix) =>
+        AssetDatabase.FindAssets(prefix + " t:AudioClip", new[] { Sounds.TrimEnd('/') })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Where(p => System.IO.Path.GetFileName(p).StartsWith(prefix))
+            .OrderBy(p => p)
+            .Select(AssetDatabase.LoadAssetAtPath<AudioClip>)
+            .ToArray();
 
     private static Transform Find(GameObject go, string name) =>
         go.GetComponentsInChildren<Transform>(true).First(t => t.name == name);

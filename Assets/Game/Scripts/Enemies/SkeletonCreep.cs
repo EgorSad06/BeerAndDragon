@@ -12,6 +12,7 @@ using UnityEngine;
 //  - щит (у щитовика -- меш ShieldMesh): раскраска из shieldPaints (заданная или случайная); SetBlocking -- поднять щит
 //    (проходит blockedDamage урона, удар по щиту -- анимация BlockHit), Parry -- отбив (parryTime с начала урон 0);
 //  - события анимаций: AttackHit (удар достал), ArrowReleased (стрела выпущена) -- их слушает SkeletonAI;
+//    AttackStarted -- атака началась (и когда будет удар) -- по нему SkeletonSounds свистит оружием;
 //  - смерть по Damageable: коллайдеры выключаются, тело рассыпается на кости или падает рэгдоллом (SkeletonDeath),
 //    без SkeletonDeath (или в его режиме Animation) -- анимация смерти; тело удаляет Damageable (destroyDelay).
 [RequireComponent(typeof(Animator))]
@@ -60,6 +61,8 @@ public class SkeletonCreep : MonoBehaviour
     public event System.Action ArrowReleased;
     // Удар оружием дошёл до цели (событие анимации Attack) -- здесь наносится урон
     public event System.Action AttackHit;
+    // Атака началась; аргумент -- через сколько секунд удар достанет цель (меньше 0 -- в атаке нет удара, у лучника)
+    public event System.Action<float> AttackStarted;
 
     public string CurrentWeapon { get; private set; }
     public bool IsDead { get; private set; }
@@ -162,7 +165,24 @@ public class SkeletonCreep : MonoBehaviour
         int i = Random.Range(0, attackClips.Length);
         animator.SetInteger(AttackIndexId, i);
         animator.SetTrigger(AttackId);
+        AttackStarted?.Invoke(HitTime(attackClips[i]));
         return ClipLength(attackClips[i]);
+    }
+
+    // Время события OnAttackHit от начала цепочки клипов «a+b»; -1 -- такого события нет
+    public float HitTime(string clipNames)
+    {
+        float start = 0f;
+        foreach (string name in clipNames.Split('+'))
+            foreach (AnimationClip c in animator.runtimeAnimatorController.animationClips)
+                if (c.name == name)
+                {
+                    foreach (AnimationEvent e in c.events)
+                        if (e.functionName == nameof(OnAttackHit)) return start + e.time;
+                    start += c.length;
+                    break;
+                }
+        return -1f;
     }
 
     // Вздрогнуть от удара; ответ -- сколько займёт (с)

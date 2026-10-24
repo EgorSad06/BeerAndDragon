@@ -120,7 +120,7 @@ public class Weapon : MonoBehaviour
     public float impactLifetime = 1f;
     public AudioSource audioSource;
     public AudioClip fireSound;             // не назначен -- выстрел генерируется в коде (WeaponSounds)
-    [Range(0f, 1f)] public float fireVolume = 0.8f;   // выстрел чуть тише записи
+    [Range(0f, 1f)] public float fireVolume = 0.56f;  // выстрел тише записи
     public AudioClip reloadSound;           // вставка одного патрона: звучит на каждый патрон; не назначен --
                                             // вся перезарядка одним сгенерированным звуком (WeaponSounds)
     public AudioClip emptySound;            // не назначен -- щелчок генерируется в коде (FR-WPN-03.1)

@@ -252,7 +252,7 @@ public static class WeaponSetupTool
         w.muzzleFlashLifetime = 0.05f;
         w.audioSource = audio;
         w.fireSound = AssetDatabase.LoadAssetAtPath<AudioClip>(ShotgunSounds + "shotgun_fire.ogg");
-        w.fireVolume = 0.8f;
+        w.fireVolume = 0.56f;
         w.reloadSound = AssetDatabase.LoadAssetAtPath<AudioClip>(ShotgunSounds + "shotgun_shell_insert.wav");
         w.emptySound = AssetDatabase.LoadAssetAtPath<AudioClip>(ShotgunSounds + "shotgun_empty.wav");
         w.bulletHolePrefab = G.BulletHolePrefab(AssetDatabase.LoadAssetAtPath<Texture2D>(BulletHoleTex));

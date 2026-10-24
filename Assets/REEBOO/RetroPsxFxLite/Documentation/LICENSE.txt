@@ -1,0 +1,21 @@
+Retro PSX & CRT FX LITE for Unity 6 URP (free version)
+Copyright (c) 2026 REEBOO Labs. All rights reserved.
+
+LICENSE
+
+1. You may use the contents of this package (shaders, C# scripts, presets, textures, meshes,
+   materials and demo scenes) in commercial and non-commercial games and applications, in any
+   number of projects, royalty-free. You may modify them for your projects.
+
+2. Credit ("Retro FX by REEBOO Labs") is appreciated but not required.
+
+3. You may NOT resell, redistribute, sublicense or share the contents of this package as-is or
+   modified as stand-alone assets (for example as an asset pack, shader pack, template or tool on
+   any store or website), and you may not claim them as your own work. Shipping them compiled
+   inside your game or application is allowed.
+
+4. The package is provided "as is", without warranty of any kind. REEBOO Labs is not liable for
+   any damage arising from its use.
+
+Full version: https://reebo0.itch.io/retro-psx-crt-fx-unity
+Free Lite version: https://reebo0.itch.io/retro-psx-crt-fx-unity-lite

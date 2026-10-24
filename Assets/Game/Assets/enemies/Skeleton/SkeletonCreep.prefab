@@ -78,6 +78,9 @@ PrefabInstance:
       addedObject: {fileID: 2823205459893038997}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3cb3971b71ce5564c8e21f0085b9781f, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 8360990919392382675}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3cb3971b71ce5564c8e21f0085b9781f, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 935627288189956907}
   m_SourcePrefab: {fileID: 100100000, guid: 3cb3971b71ce5564c8e21f0085b9781f, type: 3}
 --- !u!1 &2177241594379372251 stripped
@@ -167,7 +170,7 @@ MonoBehaviour:
   mode: 2
   scatterSpeed: 4.5
   popUp: 1.5
-  boneDensity: 900
+  boneDensity: 250
   skipRenderers:
   - BowStringMesh
   ragdollMass: 20
@@ -175,6 +178,37 @@ MonoBehaviour:
   ragdollTime: 1.3
   remainsTime: 12
   sinkTime: 2
+--- !u!114 &8360990919392382675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2177241594379372251}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c32d2e674ab982442af15106bb17b428, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkeletonSounds
+  boneCracks:
+  - {fileID: 8300000, guid: 17b20326b28f05f458f9520785c50b0b, type: 3}
+  - {fileID: 8300000, guid: b7463cad5d254a84a84348b25d2af100, type: 3}
+  - {fileID: 8300000, guid: 5b167639c438fb148aaef422c2daafd2, type: 3}
+  - {fileID: 8300000, guid: 0704a29c2a28f564197ee9c8b1f050d6, type: 3}
+  - {fileID: 8300000, guid: 6d728e775ea427549ab6c2a180c6c8ad, type: 3}
+  - {fileID: 8300000, guid: feab581fab3479a4d8683f5cbea7ab67, type: 3}
+  swings:
+  - {fileID: 8300000, guid: 72beabe75b3878649839b61faea3fe4c, type: 3}
+  - {fileID: 8300000, guid: fadca8eb03e585145adc192edc64232c, type: 3}
+  - {fileID: 8300000, guid: 110763da5bd1fe14c8b10360f951ac9b, type: 3}
+  bowShots: []
+  rattleInterval: {x: 5, y: 14}
+  rattleVolume: 0.25
+  swingVolume: 0.8
+  bowVolume: 0.7
+  deathVolume: 0.9
+  swingLead: 0.3
+  maxDistance: 25
 --- !u!114 &935627288189956907
 MonoBehaviour:
   m_ObjectHideFlags: 0

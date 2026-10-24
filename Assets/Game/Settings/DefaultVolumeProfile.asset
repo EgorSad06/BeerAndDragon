@@ -468,6 +468,36 @@ MonoBehaviour:
   - {fileID: -6288072647309666549}
   - {fileID: 7518938298396184218}
   - {fileID: -1410297666881709256}
+  - {fileID: 532704842510576751}
+  - {fileID: 2325745871210736428}
+--- !u!114 &532704842510576751
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6ad5b4a7f4635d49a85925bc0e5208f, type: 3}
+  m_Name: RetroFxLiteVolume
+  m_EditorClassIdentifier: REEBOO.RetroFx.Lite::REEBOO.RetroFx.Lite.RetroFxLiteVolume
+  active: 1
+  intensity:
+    m_OverrideState: 1
+    m_Value: 1
+  pixelResolution:
+    m_OverrideState: 1
+    m_Value: 240
+  scanlines:
+    m_OverrideState: 1
+    m_Value: 0
+  scanlineCount:
+    m_OverrideState: 1
+    m_Value: 0
+  curvature:
+    m_OverrideState: 1
+    m_Value: 0
 --- !u!114 &853819529557874667
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -778,6 +808,28 @@ MonoBehaviour:
   contribution:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &2325745871210736428
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e3e49fdab880d84f82d0a5a814db6f0, type: 3}
+  m_Name: RetroColorVolume
+  m_EditorClassIdentifier: Assembly-CSharp::RetroColorVolume
+  active: 1
+  colourLevels:
+    m_OverrideState: 1
+    m_Value: 32
+  dither:
+    m_OverrideState: 1
+    m_Value: 0.55
+  pixelResolution:
+    m_OverrideState: 1
+    m_Value: 240
 --- !u!114 &3959858460715838825
 MonoBehaviour:
   m_ObjectHideFlags: 3
