@@ -24,6 +24,8 @@ public sealed class RetroColorVolume : VolumeComponent, IPostProcessComponent
     public ColorParameter fogColor = new ColorParameter(new Color(0.55f, 0.52f, 0.6f), false, false, true);
     public MinFloatParameter fogStart = new MinFloatParameter(8f, 0f);
     public MinFloatParameter fogEnd = new MinFloatParameter(60f, 0.1f);
+    [Tooltip("Дымка на небе (скайбоксе): 0 -- небо чистое.")]
+    public ClampedFloatParameter skyFog = new ClampedFloatParameter(0.25f, 0f, 1f);
     [Tooltip("Ступеней дымки (как полосы тумана на PS1). 0 -- плавно.")]
     public ClampedIntParameter fogSteps = new ClampedIntParameter(8, 0, 64);
 

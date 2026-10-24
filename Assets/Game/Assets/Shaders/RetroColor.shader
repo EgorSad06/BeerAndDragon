@@ -21,7 +21,7 @@ Shader "Hidden/BeerAndDragon/RetroColor"
 
             float4 _RetroColorParams; // levels, dither, cell size (px), virtual lines
             float4 _RetroFogParams;   // start, end, max density, steps
-            float4 _RetroFogColor;
+            float4 _RetroFogColor;    // rgb, a -- плотность на небе
             static const float kBayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
 
             float4 Frag(Varyings input) : SV_Target
@@ -35,10 +35,17 @@ Shader "Hidden/BeerAndDragon/RetroColor"
                 {
                     float2 cells = float2(floor(_RetroColorParams.w * _ScreenParams.x / _ScreenParams.y + 0.5), _RetroColorParams.w);
                     float2 uv = (floor(input.texcoord * cells) + 0.5) / cells;
-                    float dist = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
-                    float f = saturate((dist - _RetroFogParams.x) / (_RetroFogParams.y - _RetroFogParams.x));
+                    float raw = SampleSceneDepth(uv);
+                #if UNITY_REVERSED_Z
+                    bool sky = raw <= 0.0;
+                #else
+                    bool sky = raw >= 1.0;
+                #endif
+                    float dist = LinearEyeDepth(raw, _ZBufferParams);
+                    float f = saturate((dist - _RetroFogParams.x) / (_RetroFogParams.y - _RetroFogParams.x)) * _RetroFogParams.z;
+                    if (sky) f = _RetroFogColor.a;
                     if (_RetroFogParams.w > 0.5) f = saturate(floor(f * _RetroFogParams.w + 0.5 + bayer) / _RetroFogParams.w);
-                    c = lerp(c, _RetroFogColor.rgb, f * _RetroFogParams.z);
+                    c = lerp(c, _RetroFogColor.rgb, f);
                 }
 
             #if !defined(UNITY_COLORSPACE_GAMMA)

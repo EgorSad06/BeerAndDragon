@@ -87,6 +87,7 @@ public sealed class RetroColorFeature : ScriptableRendererFeature
                 data.fog = new Vector4(fx.fogStart.value, Mathf.Max(fx.fogEnd.value, fx.fogStart.value + 0.1f),
                                        fx.fogMax.value, fx.fogSteps.value);
                 data.fogColor = fx.fogColor.value;
+                data.fogColor.a = fx.skyFog.value;   // в альфе -- дымка на небе
                 data.depth = res.cameraDepthTexture;
                 builder.UseTexture(src, AccessFlags.Read);
                 if (data.depth.IsValid()) builder.UseTexture(data.depth, AccessFlags.Read);

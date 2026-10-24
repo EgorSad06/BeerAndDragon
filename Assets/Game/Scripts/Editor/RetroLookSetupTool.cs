@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using REEBOO.RetroFx.Lite;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -11,12 +12,16 @@ using UnityEngine.Rendering.Universal;
 //    пикселизация) и RetroColorFeature (свой: уровни цвета + дизеринг), в этом порядке;
 //  - настройки -- в профиль по умолчанию URP (Assets/Game/Settings/DefaultVolumeProfile), значит, во всех сценах:
 //    Intensity 1, Pixel Resolution 240, Colour Levels 32, Dither 0.55; сканлайны и кривизна экрана выключены;
-//    дымка: серо-лиловая, с 6 до 45 м, вдали 85%, 8 ступеней.
+//    дымка: рыжая (как закат на небе), с 6 до 45 м, вдали 85%, на небе 25%, 8 ступеней;
+//  - небо: закат Assets/Game/Assets/Sky/SunsetSky.png (развёртка куба «крестом» 4x3) -> кубмапа и материал
+//    SunsetSky.mat (Skybox/Cubemap); ставится в открытую сцену (Lighting -> Environment -> Skybox Material).
 // PSX-шейдеры поверхностей (дрожание вершин, аффинные текстуры) не ставятся -- материалы остаются свои.
 public static class RetroLookSetupTool
 {
     const string Profile = "Assets/Game/Settings/DefaultVolumeProfile.asset";
     const int PixelResolution = 240;
+    const string SkyTexture = "Assets/Game/Assets/Sky/SunsetSky.png";
+    const string SkyMaterial = "Assets/Game/Assets/Sky/SunsetSky.mat";
 
     [MenuItem("Tools/BeerAndDragon/Setup PS1 Look")]
     public static void Setup()
@@ -39,7 +44,8 @@ public static class RetroLookSetupTool
         colour.dither.Override(0.55f);
         colour.pixelResolution.Override(PixelResolution);
         colour.fogMax.Override(0.85f);
-        colour.fogColor.Override(new Color(0.42f, 0.4f, 0.46f));
+        colour.fogColor.Override(new Color(0.78f, 0.36f, 0.14f));
+        colour.skyFog.Override(0.25f);
         colour.fogStart.Override(6f);
         colour.fogEnd.Override(45f);
         colour.fogSteps.Override(8);
@@ -47,7 +53,36 @@ public static class RetroLookSetupTool
         EditorUtility.SetDirty(colour);
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
+
+        RenderSettings.skybox = Sky();
+        DynamicGI.UpdateEnvironment();
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
         Debug.Log("[PS1 Look] renderers: " + string.Join(", ", Renderers().Select(r => r.name)) + "; profile " + Profile);
+    }
+
+    // Кубмапа из «креста» и материал неба (создаются один раз)
+    public static Material Sky()
+    {
+        var importer = (TextureImporter)AssetImporter.GetAtPath(SkyTexture);
+        if (importer.textureShape != TextureImporterShape.TextureCube)
+        {
+            importer.textureShape = TextureImporterShape.TextureCube;
+            importer.generateCubemap = TextureImporterGenerateCubemap.AutoCubemap;
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.maxTextureSize = 2048;
+            importer.SaveAndReimport();
+        }
+        Material mat = AssetDatabase.LoadAssetAtPath<Material>(SkyMaterial);
+        if (mat == null)
+        {
+            mat = new Material(Shader.Find("Skybox/Cubemap"));
+            AssetDatabase.CreateAsset(mat, SkyMaterial);
+        }
+        mat.SetTexture("_Tex", AssetDatabase.LoadAssetAtPath<Cubemap>(SkyTexture));
+        EditorUtility.SetDirty(mat);
+        AssetDatabase.SaveAssets();
+        return mat;
     }
 
     private static IEnumerable<ScriptableRendererData> Renderers()
