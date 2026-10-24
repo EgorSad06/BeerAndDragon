@@ -10,6 +10,7 @@ using UnityEngine.Rendering;
 //    опускание таза в Death, шаг в Attack) запечено в позу -- враг двигается скриптом, root motion не нужен;
 //  - события: в Shoot (лучник) -- OnArrowRelease на кадре, где отпущена тетива; в Attack -- OnAttackHit на кадре
 //    удара (SkeletonCreep.ArrowReleased / AttackHit); модели из StaticModels (стрела) -- без рига;
+//  - меши читаемые (Read/Write) -- SkeletonDeath режет их на кости во время игры;
 //  - материалы: матовые; *EyeFire светится синим (HDR); *EyeGlow -- аддитивный ореол с текстурой Textures/<имя>.png;
 //    если есть Textures/<материал>_Emission.png -- это карта свечения (синие глаза на текстуре скелета);
 //  - текстуры -- PSX: point-фильтр, без мип-карт и сжатия; у ореола края не повторяются (Clamp).
@@ -46,6 +47,7 @@ public class EnemyModelImporter : AssetPostprocessor
         m.animationType = ModelImporterAnimationType.Human;
         m.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
         m.importAnimation = true;
+        m.isReadable = true;   // SkeletonDeath режет скин-меш на кости во время игры
         m.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
         m.materialLocation = ModelImporterMaterialLocation.External;
     }

@@ -83,6 +83,12 @@ public class SkeletonDeath : MonoBehaviour
     public bool Play()
     {
         if (mode == Mode.Animation) return false;
+        foreach (SkinnedMeshRenderer smr in GetComponentsInChildren<SkinnedMeshRenderer>())
+            if (!smr.sharedMesh.isReadable)
+            {
+                Debug.LogWarning($"SkeletonDeath: меш {smr.sharedMesh.name} без Read/Write -- играет анимация смерти", this);
+                return false;
+            }
         animator = GetComponent<Animator>();
         BowRig rig = GetComponent<BowRig>();
         if (rig != null) rig.enabled = false;
