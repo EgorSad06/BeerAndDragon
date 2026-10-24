@@ -19,6 +19,10 @@ public class Damageable : MonoBehaviour, IDamageable
     public float Health { get; private set; }
     public bool IsDead => Health <= 0f;
 
+    // Последнее попадание (TakeHit): точка и толчок; ноль -- урон пришёл без направления (TakeDamage)
+    public Vector3 LastHitPoint { get; private set; }
+    public Vector3 LastHitImpulse { get; private set; }
+
     // Вызывается при каждом попадании (урон до множителя) -- например, чтобы щит дрогнул от удара
     public event System.Action<float> Damaged;
 
@@ -40,7 +44,15 @@ public class Damageable : MonoBehaviour, IDamageable
 
     public void TakeDamage(float amount)
     {
+        TakeHit(amount, transform.position, Vector3.zero);
+    }
+
+    // Урон с местом и направлением удара -- по ним, например, разлетаются кости скелета
+    public void TakeHit(float amount, Vector3 point, Vector3 impulse)
+    {
         if (IsDead) return;
+        LastHitPoint = point;
+        LastHitImpulse = impulse;
 
         Damaged?.Invoke(amount);
         amount *= damageMultiplier;

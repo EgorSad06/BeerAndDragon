@@ -10,7 +10,8 @@ using UnityEngine;
 //    шаги вбок; по триггеру Attack -- атака номер AttackIndex (у лучника цепочка: достать стрелу, натянуть,
 //    выстрелить; состояния с тегом Attack); Hit -- вздрогнуть; Fidget -- почесаться; Die -- смерть DeathIndex;
 //    у щитовика ещё Block (пока Blocking), BlockHit (удар по щиту), Parry (свой клип из SkeletonShield.fbx);
-//  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonAI (роль, скорости
+//  - префаб: модель + Animator + SkeletonCreep + Damageable + CharacterController + SkeletonDeath (смерть --
+//    рассыпаться на кости или рэгдолл) + SkeletonAI (роль, скорости
 //    шагов из анимаций); лучнику -- BowRig (тетива, стрела) и SkeletonArrow.prefab; щитовику -- раскраски щита;
 //  - лук и щит поворачиваются в руке так, чтобы в позах Mixamo лук стоял вертикально тетивой к правой руке
 //    (прицел), а щит -- лицом вперёд (стойка, ходьба, блок -- в среднем); кости-метки BowTop/BowString,
@@ -109,6 +110,8 @@ public static class SkeletonCreepBuilder
             AlignToClips(go, new[] { (clips["shield_idle"], 0.5f), (clips["shield_walk"], 0.3f), (clips["shield_block_idle"], 0.3f) },
                          "Shield", "ShieldTop", "ShieldFront", g => g.transform.forward);
         }
+
+        go.AddComponent<SkeletonDeath>();   // смерть: рассыпается на кости
 
         SkeletonAI ai = go.AddComponent<SkeletonAI>();
         ai.role = v.Role;

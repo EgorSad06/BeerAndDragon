@@ -99,6 +99,9 @@ PrefabInstance:
       addedObject: {fileID: 8131770873052680596}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 4912707907843803655}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 6959334845492160285}
   m_SourcePrefab: {fileID: 100100000, guid: 062acbbeb2e51d14fae02984102f9e12, type: 3}
 --- !u!1 &7268537783912835718 stripped
@@ -180,6 +183,29 @@ MonoBehaviour:
   - shield_attack2
   hitClip: shield_hit
   deathVariants: 1
+--- !u!114 &4912707907843803655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7268537783912835718}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e812ca47437d6624eb0baaaf11a8fa9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkeletonDeath
+  mode: 2
+  scatterSpeed: 4.5
+  popUp: 1.5
+  boneDensity: 900
+  skipRenderers:
+  - BowStringMesh
+  ragdollMass: 20
+  ragdollImpulse: 35
+  ragdollTime: 1.3
+  remainsTime: 12
+  sinkTime: 2
 --- !u!114 &6959334845492160285
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -12,7 +12,8 @@ using UnityEngine;
 //  - щит (у щитовика -- меш ShieldMesh): раскраска из shieldPaints (заданная или случайная); SetBlocking -- поднять щит
 //    (проходит blockedDamage урона, удар по щиту -- анимация BlockHit), Parry -- отбив (parryTime с начала урон 0);
 //  - события анимаций: AttackHit (удар достал), ArrowReleased (стрела выпущена) -- их слушает SkeletonAI;
-//  - смерть по Damageable: проигрывается анимация, коллайдеры выключаются, тело удаляет Damageable (destroyDelay).
+//  - смерть по Damageable: коллайдеры выключаются, тело рассыпается на кости или падает рэгдоллом (SkeletonDeath),
+//    без SkeletonDeath (или в его режиме Animation) -- анимация смерти; тело удаляет Damageable (destroyDelay).
 [RequireComponent(typeof(Animator))]
 public class SkeletonCreep : MonoBehaviour
 {
@@ -209,13 +210,15 @@ public class SkeletonCreep : MonoBehaviour
         IsDead = true;
         IsBlocking = false;
         if (health != null) health.damageMultiplier = 1f;
+        foreach (Collider c in GetComponentsInChildren<Collider>()) c.enabled = false;
         animator.SetFloat(SpeedId, 0f);
         animator.SetFloat(StrafeId, 0f);
         if (HasShield) animator.SetBool(BlockingId, false);
         animator.SetBool(DeadId, true);
+        SkeletonDeath physics = GetComponent<SkeletonDeath>();
+        if (physics != null && physics.Play()) return;
         animator.SetInteger(DeathIndexId, Random.Range(0, deathVariants));
         animator.SetTrigger(DieId);
-        foreach (Collider c in GetComponentsInChildren<Collider>()) c.enabled = false;
     }
 
     private static Transform FindDeep(Transform root, string name)

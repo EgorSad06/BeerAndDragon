@@ -224,7 +224,12 @@ public class Sword : MonoBehaviour
 
             IDamageable damageable = col.GetComponentInParent<IDamageable>();
             if (damageable != null && hitThisSwing.Add(damageable))
-                damageable.TakeDamage(damage * currentMultiplier);
+            {
+                if (damageable is Damageable target)
+                    target.TakeHit(damage * currentMultiplier, closest, forward * knockbackForce * currentMultiplier);
+                else
+                    damageable.TakeDamage(damage * currentMultiplier);
+            }
 
             Rigidbody rb = col.attachedRigidbody;
             if (rb != null && !rb.isKinematic && hitThisSwing.Add(rb))

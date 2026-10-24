@@ -380,7 +380,9 @@ public class Weapon : MonoBehaviour
             float mult = FalloffMultiplier(hit.distance, falloffStart, falloffEnd, minDamageMultiplier);
 
             IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
-            if (damageable != null)
+            if (damageable is Damageable target)
+                target.TakeHit(damage * mult, hit.point, dir * hitForce * mult);
+            else if (damageable != null)
                 damageable.TakeDamage(damage * mult);
 
             if (hit.rigidbody != null && !hit.rigidbody.isKinematic)
