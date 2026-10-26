@@ -7,8 +7,8 @@ using UnityEngine.UI;
 //  - хотбар сверху (1..9), выбранное оружие подсвечено;
 //  - Tab -- рюкзак под хотбаром: перетащи слот на слот или кликни по двум слотам, чтобы поменять местами;
 //    ПКМ по расходнику -- использовать;
-//  - HP слева снизу (пиксельная полоска из Pixel UI pack, если спрайты назначены), таймер энергетика над ним,
-//    справа от HP -- спидометр;
+//  - портрет рыцаря слева снизу (PlayerPortrait: живая 3D-голова в рамке, повреждения по уровню здоровья);
+//  - HP справа от портрета (пиксельная полоска из Pixel UI pack, если спрайты назначены), таймер энергетика над ним;
 //  - патроны справа снизу (в магазине / в запасе);
 //  - прицел, всплывающие сообщения, красная вспышка при уроне, экран смерти.
 public class GameHUD : MonoBehaviour
@@ -45,6 +45,8 @@ public class GameHUD : MonoBehaviour
 
     private Font font;
     private RectTransform root;
+    private PlayerPortrait portrait;
+    private float hudLeft = 32f;                  // левый край полоски HP -- справа от портрета
 
     private InventorySlotView[] slotViews;
     private GameObject backpackPanel;
@@ -95,12 +97,15 @@ public class GameHUD : MonoBehaviour
         BuildCanvas();
         BuildCrosshair();
         BuildDamageFlash();
+        portrait = PlayerPortrait.Create(root, health);
+        hudLeft = portrait.RightEdge + 16f;
         if (HasPixelBars) BuildPixelHealth();
         else BuildHealth();
         BuildAmmo();
         BuildMessages();
         BuildInventory();
         BuildDeathScreen();
+        portrait.transform.SetAsLastSibling();   // череп на портрете виден поверх экрана смерти
 
         if (inventory != null)
         {
@@ -195,7 +200,7 @@ public class GameHUD : MonoBehaviour
     {
         const float w = 420f, h = 34f;
         RectTransform box = NewRect("Health", root);
-        Place(box, Vector2.zero, Vector2.zero, new Vector2(32 + w * 0.5f, 40 + h * 0.5f), new Vector2(w, h));
+        Place(box, Vector2.zero, Vector2.zero, new Vector2(hudLeft + w * 0.5f, 40 + h * 0.5f), new Vector2(w, h));
 
         Image frame = NewImage("Frame", box, new Color(0f, 0f, 0f, 0.7f));
         Stretch(frame.rectTransform, -3f);
@@ -215,7 +220,7 @@ public class GameHUD : MonoBehaviour
         // Энергетик -- полоска над HP
         boostRoot = NewRect("Boost", root).gameObject;
         RectTransform b = (RectTransform)boostRoot.transform;
-        Place(b, Vector2.zero, Vector2.zero, new Vector2(32 + w * 0.5f, 40 + h + 40f), new Vector2(w, 10f));
+        Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft + w * 0.5f, 40 + h + 40f), new Vector2(w, 10f));
         Image bFrame = NewImage("Frame", b, new Color(0f, 0f, 0f, 0.7f));
         Stretch(bFrame.rectTransform, -2f);
         boostFillRect = NewImage("Fill", b, boostColor).rectTransform;
@@ -231,7 +236,7 @@ public class GameHUD : MonoBehaviour
         float k = pixelScale;
         Vector2 frameSize = new Vector2(48f, 11f) * k;
         RectTransform box = NewRect("Health", root);
-        Place(box, Vector2.zero, Vector2.zero, new Vector2(32f, 36f) + frameSize * 0.5f, frameSize);
+        Place(box, Vector2.zero, Vector2.zero, new Vector2(hudLeft, 36f) + frameSize * 0.5f, frameSize);
 
         PixelImage("Frame", box, hpFrame, Vector2.zero, frameSize);
         Vector2 barPos = new Vector2(3f, 3f) * k, barSize = new Vector2(42f, 5f) * k;
@@ -253,7 +258,7 @@ public class GameHUD : MonoBehaviour
             Vector2 smallSize = new Vector2(42f, 11f) * ks;
             boostRoot = NewRect("Boost", root).gameObject;
             RectTransform b = (RectTransform)boostRoot.transform;
-            Place(b, Vector2.zero, Vector2.zero, new Vector2(32f, 36f + frameSize.y + 44f) + smallSize * 0.5f, smallSize);
+            Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft, 36f + frameSize.y + 44f) + smallSize * 0.5f, smallSize);
             PixelImage("Frame", b, smallFrame, Vector2.zero, smallSize);
             Vector2 sPos = new Vector2(4f, 3f) * ks, sSize = new Vector2(34f, 5f) * ks;
             PixelImage("Empty", b, smallEmpty, sPos, sSize);
@@ -266,7 +271,7 @@ public class GameHUD : MonoBehaviour
         {
             boostRoot = NewRect("Boost", root).gameObject;
             RectTransform b = (RectTransform)boostRoot.transform;
-            Place(b, Vector2.zero, Vector2.zero, new Vector2(32f + frameSize.x * 0.5f, 36f + frameSize.y + 40f), new Vector2(frameSize.x, 10f));
+            Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft + frameSize.x * 0.5f, 36f + frameSize.y + 40f), new Vector2(frameSize.x, 10f));
             Stretch(NewImage("Frame", b, new Color(0f, 0f, 0f, 0.7f)).rectTransform, -2f);
             boostFillRect = NewImage("Fill", b, boostColor).rectTransform;
             FillRect(boostFillRect, 1f);
