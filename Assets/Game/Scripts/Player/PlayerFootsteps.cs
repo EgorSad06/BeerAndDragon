@@ -1,7 +1,7 @@
 using UnityEngine;
 
-// Шаги игрока: пока рыцарь идёт по земле, через каждые stepDistance метров -- случайный шаг по траве
-// (Resources/Sounds/Player/step_grass_*). Чем быстрее бежим, тем чаще шаги; в воздухе, в подкате и на скейте тихо.
+// Шаги игрока: пока рыцарь идёт по земле, через каждые stepDistance метров -- случайный шаг
+// (Resources/Sounds/Player/Steps/*, сейчас -- по бетону). Чем быстрее бежим, тем чаще шаги; в воздухе, в подкате и на скейте тихо.
 // Добавляется сам из KnightMovement, в сцене настраивать ничего не нужно.
 [RequireComponent(typeof(KnightMovement))]
 public class PlayerFootsteps : MonoBehaviour

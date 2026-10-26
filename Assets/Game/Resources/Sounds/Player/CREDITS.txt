@@ -1,4 +1,4 @@
 Звуки игрока. Записи с freesound.org, лицензия Creative Commons 0 (CC0) -- указывать авторство не обязательно.
 
 drink_slurp.wav        -- FOSSarts, "slurping up drink from mug - 3" (761926), обрезано до 1.25 с, громче
-Steps/step_grass_1..6  -- FOSSarts, "walk grass night 1" (740145), нарезано на 6 шагов, громче
+Steps/step_concrete_1..4 -- FOSSarts, "walking indoors on concrete floor 1" (740419), нарезано на 4 шага, громче
