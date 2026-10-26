@@ -23,6 +23,10 @@ public class ItemUser : MonoBehaviour
     public Material smokeMaterial;
     public Material emberMaterial;
 
+    [Header("Sounds (пусто -- загрузится из Resources/Sounds/Player)")]
+    public AudioClip drinkSound;
+    [Range(0f, 1f)] public float drinkVolume = 0.8f;
+
     [Header("Timing")]
     public float putAwayTime = 0.35f;       // после эффекта -- опускаем руку и выбрасываем
 
@@ -52,9 +56,11 @@ public class ItemUser : MonoBehaviour
     private Transform emberFP, emberTP;
     private ParticleSystem wispFP, wispTP;
     private readonly List<Material> runtimeMats = new List<Material>();
+    private AudioSource audioSource;
 
     void Awake()
     {
+        if (drinkSound == null) drinkSound = Resources.Load<AudioClip>("Sounds/Player/drink_slurp");
         if (inventory == null) inventory = GetComponent<Inventory>();
         if (health == null) health = GetComponent<PlayerHealth>();
         if (weaponSwitcher == null) weaponSwitcher = GetComponentInChildren<WeaponSwitcher>(true);
@@ -107,7 +113,22 @@ public class ItemUser : MonoBehaviour
             }
         }
         UpdateVisibility();
+        if (item.useStyle == ItemDefinition.UseStyle.Drink) PlayDrink();
         return true;
+    }
+
+    // Глотки энергетика -- звук идёт, пока банка у рта
+    private void PlayDrink()
+    {
+        if (drinkSound == null) return;
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 0f;
+        }
+        audioSource.pitch = Random.Range(0.95f, 1.05f);
+        audioSource.PlayOneShot(drinkSound, drinkVolume);
     }
 
     private void Finish(bool thrown)

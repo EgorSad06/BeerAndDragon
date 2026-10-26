@@ -91,6 +91,8 @@ public class KnightMovement : MonoBehaviour
         readyToJump = true; 
 
         startYScale = transform.localScale.y;
+
+        if (GetComponent<PlayerFootsteps>() == null) gameObject.AddComponent<PlayerFootsteps>();   // звук шагов
     }
     
     void Update()
