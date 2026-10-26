@@ -3,6 +3,8 @@ using UnityEngine;
 
 // Меч ближнего боя. Анимация процедурная (без аниматора): пивот с моделью
 // крутится по трём ключевым позам start -> mid -> end, удары чередуются справа/слева.
+// Удар в три фазы: замах (меч уходит назад) -> удар (дуга, шлейф от клинка, свист) -> возврат в стойку
+// с перехлёстом. Камеру толкает в сторону удара; при попадании по врагу -- стоп-кадр и толчок сильнее.
 //
 // Фишки:
 //  - удар бьёт всех IDamageable в конусе перед камерой, каждого один раз за взмах;
@@ -56,6 +58,15 @@ public class Sword : MonoBehaviour
     public Vector3 endEuler = new Vector3(40f, 45f, 70f);
     public Vector3 swingPosOffset = new Vector3(-0.15f, 0.05f, 0.15f); // куда сдвигается пивот к середине взмаха
 
+    [Header("Feel (сочность удара)")]
+    public float windupTime = 0.08f;                                   // замах перед ударом
+    public Vector3 windupExtraEuler = new Vector3(-12f, -10f, -12f);   // насколько дальше start-позы уходит меч
+    public float recoveryTime = 0.22f;                                 // возврат в стойку (с перехлёстом)
+    public Vector2 swingKick = new Vector2(-0.5f, 1.4f);              // толчок камеры при ударе: pitch, yaw в сторону удара
+    public Vector2 hitKick = new Vector2(1.2f, 0.9f);                 // толчок при попадании
+    public float hitStopTime = 0.06f;                                 // стоп-кадр при попадании по врагу, сек (реальных)
+    [Range(0f, 1f)] public float hitStopScale = 0.05f;
+
     [Header("Refs (найдутся сами)")]
     public Transform aimOrigin;
     public Transform owner;
@@ -70,6 +81,10 @@ public class Sword : MonoBehaviour
     public float hitEffectLifetime = 1f;
 
     private float nextAttackTime;
+    private bool windingUp, recovering;
+    private float phaseTimer;
+    private Quaternion phaseFromRot;
+    private Vector3 phaseFromPos;
     private bool swinging;
     private bool hitDone;
     private float swingTimer;
@@ -80,6 +95,10 @@ public class Sword : MonoBehaviour
     private Quaternion pivotRestRot;
     private readonly Collider[] overlapBuffer = new Collider[32];
     private readonly HashSet<object> hitThisSwing = new HashSet<object>();
+    private CameraPOV cameraPov;
+    private SwordTrail trail;
+    private AudioClip[] swingClips;
+    private bool inHitStop;
 
     public bool IsSwinging => swinging;
     public bool IsCharging => holding;
@@ -106,13 +125,20 @@ public class Sword : MonoBehaviour
             pivotRestRot = swingPivot.localRotation;
         }
         mirrored = HeldLeft;   // первый удар -- со стороны, где держим меч
+
+        if (aimOrigin != null) cameraPov = aimOrigin.GetComponent<CameraPOV>();
+        if (swingPivot != null) trail = SwordTrail.Attach(transform, swingPivot);
+        swingClips = swingSound != null ? new[] { swingSound } : Resources.LoadAll<AudioClip>("Sounds/Player/SwordSwing");
+        if (audioSource == null && swingClips.Length > 0) audioSource = gameObject.AddComponent<AudioSource>();
     }
 
     private bool HeldLeft => holdPosition.x < 0f;
 
     void OnDisable()
     {
-        swinging = false;
+        swinging = windingUp = recovering = false;
+        if (trail != null) trail.Emitting = false;
+        if (inHitStop) { Time.timeScale = 1f; inHitStop = false; }
         holding = false;
         holdTimer = 0f;
         if (swingPivot != null)
@@ -131,7 +157,7 @@ public class Sword : MonoBehaviour
     private void HandleInput()
     {
         if (PlayerInputLock.Locked) { holding = false; return; }
-        if (swinging) return;
+        if (swinging || windingUp) return;
 
         if (Input.GetKeyDown(attackKey) && Time.time >= nextAttackTime)
         {
@@ -151,20 +177,72 @@ public class Sword : MonoBehaviour
 
     private void StartSwing(float multiplier)
     {
-        swinging = true;
+        windingUp = true;
+        recovering = false;
+        phaseTimer = 0f;
+        phaseFromRot = swingPivot != null ? swingPivot.localRotation : Quaternion.identity;
+        phaseFromPos = swingPivot != null ? swingPivot.localPosition : Vector3.zero;
         hitDone = false;
         swingTimer = 0f;
         currentMultiplier = multiplier;
         hitThisSwing.Clear();
         nextAttackTime = Time.time + attackCooldown;
+        if (swingPivot == null) BeginStrike();
+    }
 
-        if (audioSource != null && swingSound != null)
-            audioSource.PlayOneShot(swingSound, multiplier > 1f ? 1f : 0.8f);
+    // Замах закончился -- пошёл сам удар: свист, толчок камеры, шлейф
+    private void BeginStrike()
+    {
+        windingUp = false;
+        swinging = true;
+        swingTimer = 0f;
+        float side = mirrored ? 1f : -1f;   // слева направо -- камеру ведёт вправо
+        if (cameraPov != null) cameraPov.AddRecoil(swingKick.x * currentMultiplier, swingKick.y * side * currentMultiplier);
+        if (trail != null) trail.Emitting = true;
+        if (audioSource != null && swingClips != null && swingClips.Length > 0)
+        {
+            audioSource.pitch = Random.Range(0.92f, 1.08f) / (currentMultiplier > 1f ? 1.15f : 1f);   // тяжёлый -- ниже
+            audioSource.PlayOneShot(swingClips[Random.Range(0, swingClips.Length)], currentMultiplier > 1f ? 1f : 0.75f);
+        }
+    }
+
+    private Quaternion StartPose => Quaternion.Euler(Mirror(startEuler));
+    private Quaternion CockedPose => StartPose * Quaternion.Euler(Mirror(windupExtraEuler));
+
+    private static float EaseOut(float x) => 1f - (1f - x) * (1f - x);
+
+    private static float EaseOutBack(float x)
+    {
+        const float c1 = 1.7f, c3 = c1 + 1f;
+        x -= 1f;
+        return 1f + c3 * x * x * x + c1 * x * x;
     }
 
     private void UpdateSwing()
     {
         if (swingPivot == null) return;
+
+        if (windingUp)
+        {
+            phaseTimer += Time.deltaTime;
+            float w = EaseOut(Mathf.Clamp01(phaseTimer / Mathf.Max(0.01f, windupTime)));
+            Vector3 back = (mirrored ? new Vector3(-swingPosOffset.x, swingPosOffset.y, swingPosOffset.z) : swingPosOffset) * -0.35f;
+            swingPivot.localRotation = Quaternion.Slerp(phaseFromRot, pivotRestRot * CockedPose, w);
+            swingPivot.localPosition = Vector3.Lerp(phaseFromPos, pivotRestPos + back, w);
+            if (phaseTimer >= windupTime) BeginStrike();
+            return;
+        }
+
+        if (recovering)
+        {
+            phaseTimer += Time.deltaTime;
+            float r = Mathf.Clamp01(phaseTimer / Mathf.Max(0.01f, recoveryTime));
+            float e = EaseOutBack(r);   // проскакивает стойку и возвращается
+            swingPivot.localRotation = Quaternion.SlerpUnclamped(phaseFromRot, pivotRestRot, e);
+            swingPivot.localPosition = Vector3.LerpUnclamped(phaseFromPos, pivotRestPos, e);
+            if (r >= 1f) recovering = false;
+            return;
+        }
 
         if (!swinging)
         {
@@ -186,7 +264,7 @@ public class Sword : MonoBehaviour
         float t = Mathf.Clamp01(swingTimer / swingDuration);
         float k = swingCurve.Evaluate(t);
 
-        Quaternion a = Quaternion.Euler(Mirror(startEuler));
+        Quaternion a = CockedPose;   // удар начинается из замаха
         Quaternion b = Quaternion.Euler(Mirror(midEuler));
         Quaternion c = Quaternion.Euler(Mirror(endEuler));
         Quaternion rot = k < 0.5f ? Quaternion.Slerp(a, b, k * 2f) : Quaternion.Slerp(b, c, (k - 0.5f) * 2f);
@@ -204,6 +282,11 @@ public class Sword : MonoBehaviour
         if (t >= 1f)
         {
             swinging = false;
+            if (trail != null) trail.Emitting = false;
+            recovering = true;
+            phaseTimer = 0f;
+            phaseFromRot = swingPivot.localRotation;
+            phaseFromPos = swingPivot.localPosition;
             mirrored = !mirrored; // следующий удар в другую сторону
         }
     }
@@ -220,7 +303,7 @@ public class Sword : MonoBehaviour
         float radius = Mathf.Max(attackRadius, attackRange * 0.5f);
 
         int count = Physics.OverlapSphereNonAlloc(center, radius, overlapBuffer, hitMask, QueryTriggerInteraction.Ignore);
-        bool hitAnything = false;
+        bool hitAnything = false, hitEnemy = false;
 
         for (int i = 0; i < count; i++)
         {
@@ -238,6 +321,7 @@ public class Sword : MonoBehaviour
             IDamageable damageable = col.GetComponentInParent<IDamageable>();
             if (damageable != null && hitThisSwing.Add(damageable))
             {
+                hitEnemy = true;
                 if (damageable is Damageable target)
                     target.TakeHit(damage * currentMultiplier, closest, forward * knockbackForce * currentMultiplier);
                 else
@@ -258,6 +342,23 @@ public class Sword : MonoBehaviour
                 audioSource.PlayOneShot(hitSound);
             TryPogo(forward);
         }
+        if (hitEnemy)
+        {
+            float side = mirrored ? 1f : -1f;
+            if (cameraPov != null) cameraPov.AddRecoil(hitKick.x * currentMultiplier, hitKick.y * side);
+            if (hitStopTime > 0f && !inHitStop && Mathf.Approximately(Time.timeScale, 1f))
+                StartCoroutine(HitStop(hitStopTime * (currentMultiplier > 1f ? 1.6f : 1f)));
+        }
+    }
+
+    // Стоп-кадр: на мгновение почти останавливаем время -- удар "вязнет" в цели
+    private System.Collections.IEnumerator HitStop(float seconds)
+    {
+        inHitStop = true;
+        Time.timeScale = hitStopScale;
+        yield return new WaitForSecondsRealtime(seconds);
+        if (inHitStop && Mathf.Approximately(Time.timeScale, hitStopScale)) Time.timeScale = 1f;
+        inHitStop = false;
     }
 
     // ClosestPoint не работает с невыпуклыми MeshCollider и террейном -- для них берём bounds
