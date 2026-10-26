@@ -325,11 +325,10 @@ public static class WeaponSetupTool
 
         GameObject root = new GameObject("Sword");
         root.transform.SetParent(holder, false);
-        root.transform.localPosition = new Vector3(0.28f, -0.32f, 0.4f);
+        root.transform.localPosition = new Vector3(-0.5f, -0.64f, 0.85f);   // как Sword.holdPosition
 
         GameObject pivot = new GameObject("Pivot");
         pivot.transform.SetParent(root.transform, false);
-        pivot.transform.localRotation = Quaternion.Euler(35f, -10f, 20f);
 
         GameObject model = G.MeshObject("Model", pivot.transform, G.SwordMesh(), steel, gold, leather);
         model.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;

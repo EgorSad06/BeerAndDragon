@@ -40,6 +40,10 @@ public class Sword : MonoBehaviour
     public float pogoVelocity = 11f;        // 0 -- выключено
     [Range(-1f, 0f)] public float pogoLookDownDot = -0.55f; // насколько вниз надо смотреть
 
+    [Header("Hold pose (в покое): слева, клинок вертикально, плашмя к экрану")]
+    public Vector3 holdPosition = new Vector3(-0.5f, -0.64f, 0.85f);   // относительно камеры; x < 0 -- меч слева
+    public Vector3 holdEuler = Vector3.zero;                           // клинок по +Y, плоскость -- к экрану
+
     [Header("Swing animation")]
     public Transform swingPivot;
     public float swingDuration = 0.22f;
@@ -94,12 +98,17 @@ public class Sword : MonoBehaviour
         if (playerBody == null && owner != null) playerBody = owner.GetComponent<Rigidbody>();
         if (movement == null && owner != null) movement = owner.GetComponent<KnightMovement>();
 
+        transform.localPosition = holdPosition;
         if (swingPivot != null)
         {
+            swingPivot.localRotation = Quaternion.Euler(holdEuler);
             pivotRestPos = swingPivot.localPosition;
             pivotRestRot = swingPivot.localRotation;
         }
+        mirrored = HeldLeft;   // первый удар -- со стороны, где держим меч
     }
+
+    private bool HeldLeft => holdPosition.x < 0f;
 
     void OnDisable()
     {
@@ -162,7 +171,11 @@ public class Sword : MonoBehaviour
             Quaternion targetRot = pivotRestRot;
             // Замах назад, пока держим кнопку -- видно, что копится тяжёлый удар
             if (holding)
-                targetRot = pivotRestRot * Quaternion.Euler(Vector3.Lerp(Vector3.zero, chargePoseEuler, Mathf.Clamp01(holdTimer / chargeTime)));
+            {
+                // меч слева -- замах тоже зеркальный, через левое плечо
+                Vector3 charge = HeldLeft ? new Vector3(chargePoseEuler.x, -chargePoseEuler.y, -chargePoseEuler.z) : chargePoseEuler;
+                targetRot = pivotRestRot * Quaternion.Euler(Vector3.Lerp(Vector3.zero, charge, Mathf.Clamp01(holdTimer / chargeTime)));
+            }
 
             swingPivot.localRotation = Quaternion.Slerp(swingPivot.localRotation, targetRot, Time.deltaTime * returnSpeed);
             swingPivot.localPosition = Vector3.Lerp(swingPivot.localPosition, pivotRestPos, Time.deltaTime * returnSpeed);
