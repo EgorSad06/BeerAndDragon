@@ -256,10 +256,10 @@ public class KnightAnimator : MonoBehaviour
         }
         else if (state == KnightMovement.MovementState.sliding)
         {
-            // Подкат: одна нога вперёд, корпус назад
+            // Подкат: правая нога вперёд (её же видно от первого лица), корпус назад
             p.bodyPitch = -25f; p.bodyDrop = 0.45f;
-            p.legL = 70f; p.kneeL = 10f;
-            p.legR = 20f; p.kneeR = 95f;
+            p.legR = 70f; p.kneeR = 10f;
+            p.legL = 20f; p.kneeL = 95f;
             p.armL = 40f; p.armR = -20f; p.armOutL = 35f; p.armOutR = 45f; p.elbowL = 30f;
             p.headPitch = 10f;
         }

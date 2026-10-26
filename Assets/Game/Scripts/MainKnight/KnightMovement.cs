@@ -88,6 +88,7 @@ public class KnightMovement : MonoBehaviour
         startYScale = transform.localScale.y;
 
         if (GetComponent<PlayerFootsteps>() == null) gameObject.AddComponent<PlayerFootsteps>();   // звук шагов
+        if (GetComponent<PlayerSlide>() == null) gameObject.AddComponent<PlayerSlide>();           // урон и нога в подкате
     }
     
     void Update()
