@@ -97,4 +97,44 @@ public class WeaponTests
         Assert.Less(Mathf.Abs(data[data.Length - 1]), 0.05f, "к концу звук затухает");
         Object.DestroyImmediate(clip);
     }
+
+    // Shotgun jump: выстрел вниз толкает вверх, но каждый следующий в воздухе слабее, а скорость подъёма ограничена
+    [Test]
+    public void SelfKnockback_AirShotsGetWeaker()
+    {
+        var go = new GameObject("Shotgun");
+        Weapon w = go.AddComponent<Weapon>();
+        w.selfKnockback = 6f;
+        w.airKnockbackFalloff = 0.5f;
+        Assert.AreEqual(6f, w.SelfKnockback(Vector3.down).y, 0.001f);
+        Assert.AreEqual(3f, w.SelfKnockback(Vector3.down).y, 0.001f);
+        Assert.AreEqual(1.5f, w.SelfKnockback(Vector3.down).y, 0.001f);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void SelfKnockback_RiseSpeedIsCapped()
+    {
+        var go = new GameObject("Shotgun");
+        Weapon w = go.AddComponent<Weapon>();
+        w.selfKnockback = 6f;
+        w.maxKnockbackRiseSpeed = 7f;
+        w.playerBody = go.AddComponent<Rigidbody>();
+        w.playerBody.linearVelocity = new Vector3(0f, 5f, 0f);
+        Assert.AreEqual(2f, w.SelfKnockback(Vector3.down).y, 0.001f, "уже летим вверх 5 м/с -- добавится только до 7");
+        w.playerBody.linearVelocity = new Vector3(0f, 9f, 0f);
+        Assert.AreEqual(0f, w.SelfKnockback(Vector3.down).y, 0.001f, "быстрее предела вверх не разгоняет");
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void SelfKnockback_SidewaysPushUnchanged()
+    {
+        var go = new GameObject("Shotgun");
+        Weapon w = go.AddComponent<Weapon>();
+        w.selfKnockback = 6f;
+        for (int i = 0; i < 3; i++)
+            TestUtil.AreClose(new Vector3(0f, 0f, -6f), w.SelfKnockback(Vector3.forward));
+        Object.DestroyImmediate(go);
+    }
 }

@@ -81,6 +81,12 @@ public class Weapon : MonoBehaviour
     [Header("Self knockback / отдача в игрока")]
     public Rigidbody playerBody;            // найдётся сам (Rigidbody на корне игрока)
     public float selfKnockback = 0f;        // >0 -- выстрел толкает игрока назад от прицела (shotgun jump)
+    // Чтобы на shotgun jump нельзя было улететь: каждый следующий выстрел в воздухе толкает вверх слабее
+    // (сброс -- на земле), а выше maxKnockbackRiseSpeed выстрелы игрока вверх не разгоняют
+    [Range(0f, 1f)] public float airKnockbackFalloff = 0.5f;
+    public float maxKnockbackRiseSpeed = 7f;
+    private int airShots;
+    private KnightMovement mover;
 
     [Header("Magazine / Reload")]
     public string ammoType = "shells";      // коробки AmmoPickup с таким же типом пополняют запас
@@ -175,6 +181,7 @@ public class Weapon : MonoBehaviour
         }
         if (cameraLook == null) cameraLook = GetComponentInParent<CameraPOV>();
         if (playerBody == null && owner != null) playerBody = owner.GetComponent<Rigidbody>();
+        if (playerBody != null) mover = playerBody.GetComponent<KnightMovement>();
 
         if (recoilTransform != null)
         {
@@ -232,6 +239,7 @@ public class Weapon : MonoBehaviour
 
     void Update()
     {
+        if (mover != null && mover.IsGrounded()) airShots = 0;
         TickReload();
         HandleInput();
         bulletHoles?.Tick(Time.time);
@@ -462,7 +470,22 @@ public class Weapon : MonoBehaviour
         kickTarget += new Vector3(-viewKickPitch, Random.Range(-2f, 2f), viewKickBack);
 
         if (playerBody != null && selfKnockback > 0f)
-            playerBody.AddForce(-aimDir * selfKnockback, ForceMode.VelocityChange);
+            playerBody.AddForce(SelfKnockback(aimDir), ForceMode.VelocityChange);
+    }
+
+    // Толчок игрока от выстрела: вверх -- слабее с каждым выстрелом в воздухе и не быстрее maxKnockbackRiseSpeed
+    public Vector3 SelfKnockback(Vector3 aimDir)
+    {
+        Vector3 push = -aimDir * selfKnockback;
+        if (mover != null && mover.IsGrounded()) airShots = 0;
+        if (push.y > 0f)
+        {
+            push.y *= Mathf.Pow(airKnockbackFalloff, airShots);
+            float vy = playerBody != null ? playerBody.linearVelocity.y : 0f;
+            push.y = Mathf.Clamp(maxKnockbackRiseSpeed - vy, 0f, push.y);
+        }
+        airShots++;
+        return push;
     }
 
     private void UpdateViewKick()
