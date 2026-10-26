@@ -68,10 +68,6 @@ public static class ArtUpgradeTool
 
         Undo.RecordObject(hud, "Pixel HUD");
         // Координаты -- в пикселях листа от левого верхнего угла
-        hud.hpFrame = Crop(bars, new RectInt(0, 35, 48, 11), "UI_HpFrame");      // медная рамка
-        hud.hpEmpty = Crop(bars, new RectInt(291, 6, 42, 5), "UI_HpEmpty");
-        hud.hpFill = Crop(bars, new RectInt(51, 6, 42, 5), "UI_HpFill");          // красная
-        hud.hpTrail = Crop(bars, new RectInt(51, 22, 42, 5), "UI_HpTrail");       // жёлтая -- "след" урона
         hud.smallFrame = Crop(bars, new RectInt(3, 99, 42, 11), "UI_SmallFrame");
         hud.smallEmpty = Crop(bars, new RectInt(295, 70, 34, 5), "UI_SmallEmpty");
         hud.boostFill = Crop(bars, new RectInt(55, 118, 34, 5), "UI_BoostFill");  // зелёная

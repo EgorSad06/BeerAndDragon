@@ -17,8 +17,8 @@ public class PlayerPortrait : MonoBehaviour
 
     // Окно в картинке рамки (пиксели, от левого нижнего угла) и масштаб рамки на экране (канвас 1920x1080)
     private static readonly Rect WindowPx = new Rect(49f, 48f, 399f, 411f);
-    private const float FrameScale = 0.5f;
-    private const int RtWidth = 116, RtHeight = 120;
+    private const float FrameScale = 0.7f;
+    private const int RtWidth = 140, RtHeight = 144;
 
     public float RightEdge { get; private set; }
 
@@ -48,7 +48,7 @@ public class PlayerPortrait : MonoBehaviour
     public static PlayerPortrait Create(RectTransform canvas, PlayerHealth health)
     {
         Sprite frameSprite = Resources.Load<Sprite>(Res + "PortraitFrame");
-        Vector2 frameSize = frameSprite != null ? frameSprite.rect.size * FrameScale : new Vector2(278f, 282f);
+        Vector2 frameSize = frameSprite != null ? frameSprite.rect.size * FrameScale : new Vector2(390f, 395f);
 
         RectTransform root = NewRect("Portrait", canvas);
         root.anchorMin = root.anchorMax = root.pivot = Vector2.zero;

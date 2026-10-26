@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using TMPro; 
 
 public class KnightMovement : MonoBehaviour
 {
@@ -45,10 +44,6 @@ public class KnightMovement : MonoBehaviour
     public float maxSlopeAngel;
     private RaycastHit slopeHit; 
     private bool exitingSlope;
-
-    [Header("UI Elements")]
-    public TextMeshProUGUI speedText;  
-    public TextMeshProUGUI groundText;
 
     public Transform orientation;
 
@@ -104,17 +99,6 @@ public class KnightMovement : MonoBehaviour
         SpeedControl();
         StateHandler();
         
-        if (speedText != null)
-        {
-            float currentSpeed = rb.linearVelocity.magnitude; 
-            speedText.text = "Speed: " + currentSpeed.ToString("F2"); 
-        }
-
-        if (groundText != null)
-        {
-            groundText.text = "Grounded: " + grounded.ToString();
-        }
-
         if(grounded)
             rb.linearDamping = groundDrag;
         else 

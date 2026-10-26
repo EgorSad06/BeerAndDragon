@@ -7,8 +7,8 @@ using UnityEngine.UI;
 //  - хотбар сверху (1..9), выбранное оружие подсвечено;
 //  - Tab -- рюкзак под хотбаром: перетащи слот на слот или кликни по двум слотам, чтобы поменять местами;
 //    ПКМ по расходнику -- использовать;
-//  - портрет рыцаря слева снизу (PlayerPortrait: живая 3D-голова в рамке, повреждения по уровню здоровья);
-//  - HP справа от портрета (пиксельная полоска из Pixel UI pack, если спрайты назначены), таймер энергетика над ним;
+//  - портрет рыцаря слева снизу (PlayerPortrait: живая 3D-голова в рамке) -- он же показывает здоровье;
+//  - справа от портрета -- таймер энергетика (пиксельная полоска из Pixel UI pack, если спрайты назначены);
 //  - патроны справа снизу (в магазине / в запасе);
 //  - прицел, всплывающие сообщения, красная вспышка при уроне, экран смерти.
 public class GameHUD : MonoBehaviour
@@ -29,24 +29,21 @@ public class GameHUD : MonoBehaviour
     public Color bagMetal = new Color(0.9f, 0.72f, 0.32f);
     public Color slotSelectedColor = new Color(0.85f, 0.62f, 0.2f, 0.95f);
     public Color slotPickedColor = new Color(0.3f, 0.65f, 0.95f, 0.95f);
-    public Color healthColor = new Color(0.78f, 0.12f, 0.1f);
     public Color boostColor = new Color(0.45f, 0.95f, 0.2f);
     public int slotSize = 84;
     public int slotSpacing = 6;
 
     [Header("Pixel UI (назначает Tools > BeerAndDragon > Apply New Art)")]
-    public Sprite hpFrame;
-    public Sprite hpEmpty, hpFill, hpTrail;       // полоски 42x5, внутри рамки со сдвигом (3, 3)
     public Sprite smallFrame;
     public Sprite smallEmpty, boostFill, specialFill; // полоски 34x5, внутри рамки со сдвигом (4, 3)
     public int pixelScale = 7;                    // во сколько раз увеличиваем пиксели
 
-    public bool HasPixelBars => hpFrame != null && hpEmpty != null && hpFill != null;
+    public bool HasPixelBars => smallFrame != null && smallEmpty != null && boostFill != null;
 
     private Font font;
     private RectTransform root;
     private PlayerPortrait portrait;
-    private float hudLeft = 32f;                  // левый край полоски HP -- справа от портрета
+    private float hudLeft = 32f;                  // левый край таймера энергетика -- справа от портрета
 
     private InventorySlotView[] slotViews;
     private GameObject backpackPanel;
@@ -58,10 +55,6 @@ public class GameHUD : MonoBehaviour
     private int pickedSlot = -1;   // первый клик при обмене кликами
     private int dragFrom = -1;
 
-    private RectTransform healthFill, healthTrail;
-    private Image healthFillImage, healthTrailImage;   // пиксельный вариант: заполнение через fillAmount
-    private Text healthText;
-    private float trailValue = 1f;
 
     private GameObject boostRoot;
     private RectTransform boostFillRect;
@@ -99,8 +92,8 @@ public class GameHUD : MonoBehaviour
         BuildDamageFlash();
         portrait = PlayerPortrait.Create(root, health);
         hudLeft = portrait.RightEdge + 16f;
-        if (HasPixelBars) BuildPixelHealth();
-        else BuildHealth();
+        if (HasPixelBars) BuildPixelBoost();
+        else BuildBoost();
         BuildAmmo();
         BuildMessages();
         BuildInventory();
@@ -138,7 +131,6 @@ public class GameHUD : MonoBehaviour
 
     void Update()
     {
-        UpdateHealth();
         UpdateBoost();
         UpdateAmmo();
         UpdateMessages();
@@ -196,31 +188,13 @@ public class GameHUD : MonoBehaviour
         Stretch(damageFlash.rectTransform);
     }
 
-    private void BuildHealth()
+    // Энергетик -- полоска внизу справа от портрета, видна, пока действует (здоровье показывает сам портрет)
+    private void BuildBoost()
     {
-        const float w = 420f, h = 34f;
-        RectTransform box = NewRect("Health", root);
-        Place(box, Vector2.zero, Vector2.zero, new Vector2(hudLeft + w * 0.5f, 40 + h * 0.5f), new Vector2(w, h));
-
-        Image frame = NewImage("Frame", box, new Color(0f, 0f, 0f, 0.7f));
-        Stretch(frame.rectTransform, -3f);
-
-        healthTrail = NewImage("Trail", box, new Color(1f, 0.9f, 0.8f, 0.9f)).rectTransform;
-        FillRect(healthTrail, 1f);
-        healthFill = NewImage("Fill", box, healthColor).rectTransform;
-        FillRect(healthFill, 1f);
-
-        healthText = NewText("Text", box, 22, TextAnchor.MiddleCenter, Color.white);
-        Stretch(healthText.rectTransform);
-
-        Text label = NewText("Label", box, 18, TextAnchor.LowerLeft, new Color(1f, 0.85f, 0.7f));
-        label.text = "ЗДОРОВЬЕ";
-        Place(label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(60f, 16f), new Vector2(200f, 24f));
-
-        // Энергетик -- полоска над HP
+        const float w = 420f;
         boostRoot = NewRect("Boost", root).gameObject;
         RectTransform b = (RectTransform)boostRoot.transform;
-        Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft + w * 0.5f, 40 + h + 40f), new Vector2(w, 10f));
+        Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft + w * 0.5f, 50f), new Vector2(w, 10f));
         Image bFrame = NewImage("Frame", b, new Color(0f, 0f, 0f, 0.7f));
         Stretch(bFrame.rectTransform, -2f);
         boostFillRect = NewImage("Fill", b, boostColor).rectTransform;
@@ -230,55 +204,21 @@ public class GameHUD : MonoBehaviour
         boostRoot.SetActive(false);
     }
 
-    // HP из Pixel UI pack: рамка 48x11, внутри полоска 42x5 со сдвигом (3, 3). Пиксели увеличены в pixelScale раз.
-    private void BuildPixelHealth()
+    // Энергетик из Pixel UI pack: рамка 42x11, полоска 34x5 со сдвигом (4, 3). Пиксели увеличены в pixelScale раз.
+    private void BuildPixelBoost()
     {
-        float k = pixelScale;
-        Vector2 frameSize = new Vector2(48f, 11f) * k;
-        RectTransform box = NewRect("Health", root);
-        Place(box, Vector2.zero, Vector2.zero, new Vector2(hudLeft, 36f) + frameSize * 0.5f, frameSize);
-
-        PixelImage("Frame", box, hpFrame, Vector2.zero, frameSize);
-        Vector2 barPos = new Vector2(3f, 3f) * k, barSize = new Vector2(42f, 5f) * k;
-        PixelImage("Empty", box, hpEmpty, barPos, barSize);
-        if (hpTrail != null) healthTrailImage = FilledImage(PixelImage("Trail", box, hpTrail, barPos, barSize));
-        healthFillImage = FilledImage(PixelImage("Fill", box, hpFill, barPos, barSize));
-
-        healthText = NewText("Text", box, 26, TextAnchor.MiddleCenter, Color.white);
-        Place(healthText.rectTransform, Vector2.zero, Vector2.zero, barPos + barSize * 0.5f, barSize);
-
-        Text label = NewText("Label", box, 20, TextAnchor.LowerLeft, new Color(1f, 0.85f, 0.7f));
-        label.text = "ЗДОРОВЬЕ";
-        Place(label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(100f, 14f), new Vector2(200f, 24f));
-
-        // Энергетик -- маленькая полоска над HP: рамка 42x11, полоска 34x5 со сдвигом (4, 3)
-        if (smallFrame != null && smallEmpty != null && boostFill != null)
-        {
-            float ks = k * 0.8f;
-            Vector2 smallSize = new Vector2(42f, 11f) * ks;
-            boostRoot = NewRect("Boost", root).gameObject;
-            RectTransform b = (RectTransform)boostRoot.transform;
-            Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft, 36f + frameSize.y + 44f) + smallSize * 0.5f, smallSize);
-            PixelImage("Frame", b, smallFrame, Vector2.zero, smallSize);
-            Vector2 sPos = new Vector2(4f, 3f) * ks, sSize = new Vector2(34f, 5f) * ks;
-            PixelImage("Empty", b, smallEmpty, sPos, sSize);
-            boostFillImage = FilledImage(PixelImage("Fill", b, boostFill, sPos, sSize));
-            boostText = NewText("Text", b, 18, TextAnchor.LowerLeft, boostColor);
-            Place(boostText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(150f, 14f), new Vector2(300f, 24f));
-            boostRoot.SetActive(false);
-        }
-        else
-        {
-            boostRoot = NewRect("Boost", root).gameObject;
-            RectTransform b = (RectTransform)boostRoot.transform;
-            Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft + frameSize.x * 0.5f, 36f + frameSize.y + 40f), new Vector2(frameSize.x, 10f));
-            Stretch(NewImage("Frame", b, new Color(0f, 0f, 0f, 0.7f)).rectTransform, -2f);
-            boostFillRect = NewImage("Fill", b, boostColor).rectTransform;
-            FillRect(boostFillRect, 1f);
-            boostText = NewText("Text", b, 18, TextAnchor.LowerLeft, boostColor);
-            Place(boostText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(150f, 16f), new Vector2(300f, 24f));
-            boostRoot.SetActive(false);
-        }
+        float ks = pixelScale * 0.8f;
+        Vector2 smallSize = new Vector2(42f, 11f) * ks;
+        boostRoot = NewRect("Boost", root).gameObject;
+        RectTransform b = (RectTransform)boostRoot.transform;
+        Place(b, Vector2.zero, Vector2.zero, new Vector2(hudLeft, 36f) + smallSize * 0.5f, smallSize);
+        PixelImage("Frame", b, smallFrame, Vector2.zero, smallSize);
+        Vector2 sPos = new Vector2(4f, 3f) * ks, sSize = new Vector2(34f, 5f) * ks;
+        PixelImage("Empty", b, smallEmpty, sPos, sSize);
+        boostFillImage = FilledImage(PixelImage("Fill", b, boostFill, sPos, sSize));
+        boostText = NewText("Text", b, 18, TextAnchor.LowerLeft, boostColor);
+        Place(boostText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(150f, 14f), new Vector2(300f, 24f));
+        boostRoot.SetActive(false);
     }
 
     private Image PixelImage(string name, RectTransform parent, Sprite sprite, Vector2 bottomLeft, Vector2 size)
@@ -484,24 +424,6 @@ public class GameHUD : MonoBehaviour
     }
 
     // ---------------- Update ----------------
-
-    private void UpdateHealth()
-    {
-        if (health == null || (healthFill == null && healthFillImage == null)) return;
-        float v = Mathf.Clamp01(health.Health / Mathf.Max(1f, health.maxHealth));
-        trailValue = trailValue > v ? Mathf.MoveTowards(trailValue, v, Time.deltaTime * 0.6f) : v;
-        if (healthFillImage != null)
-        {
-            healthFillImage.fillAmount = v;
-            if (healthTrailImage != null) healthTrailImage.fillAmount = trailValue;
-        }
-        else
-        {
-            FillRect(healthFill, v);
-            FillRect(healthTrail, trailValue);
-        }
-        healthText.text = $"{Mathf.CeilToInt(health.Health)} / {Mathf.CeilToInt(health.maxHealth)}";
-    }
 
     private void UpdateBoost()
     {
