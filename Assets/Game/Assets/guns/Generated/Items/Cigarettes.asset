@@ -24,5 +24,5 @@ MonoBehaviour:
   duration: 2
   useSound: {fileID: 0}
   useStyle: 1
-  useTime: 1
+  useTime: 3
   heldPrefab: {fileID: 7237877715907426547, guid: e1727518fbde6a44ca2972ee477e017e, type: 3}

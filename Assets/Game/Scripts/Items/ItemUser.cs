@@ -2,8 +2,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Анимация использования расходников (вешается на Player).
-//  Smoke (сигареты): подносим ко рту -> затяжка (огонёк разгорается, тянется дымок)
-//                    -> выдыхаем облако -> эффект -> щелчком отправляем окурок в полёт.
+//  Smoke (сигареты): подносим ко рту -> чирк зажигалкой, искры, огонёк загорается ->
+//                    затяжки (smokeDrags штук): огонёк разгорается, табак трещит, голова чуть вверх;
+//                    после каждой -- отводим сигарету, дым изо рта и двумя струйками из носа ->
+//                    большой выдох облаком -> эффект -> щелчком отправляем окурок в полёт.
+//                    Звуки синтезированы: Resources/Sounds/Player/Smoke (tools/audio/smoke_sounds.py).
 //  Drink (энергетик): подносим, запрокидываем и пьём залпом -> эффект -> пустая банка летит прочь.
 // Эффект и списание предмета -- через item.useTime секунд после нажатия (по умолчанию 1 сек).
 // Пока идёт анимация, оружие убрано; от 1-го лица предмет висит перед камерой,
@@ -26,6 +29,12 @@ public class ItemUser : MonoBehaviour
     [Header("Sounds (пусто -- загрузится из Resources/Sounds/Player)")]
     public AudioClip drinkSound;
     [Range(0f, 1f)] public float drinkVolume = 0.8f;
+    public AudioClip lighterSound, inhaleSound, exhaleSound, exhaleLongSound;
+    [Range(0f, 1f)] public float smokeVolume = 0.7f;
+
+    [Header("Курение")]
+    [Range(1, 4)] public int smokeDrags = 2;        // затяжек до большого выдоха
+    public float dragHeadTilt = 0.8f;               // насколько голова уходит вверх на затяжке, град
 
     [Header("Timing")]
     public float putAwayTime = 0.35f;       // после эффекта -- опускаем руку и выбрасываем
@@ -47,6 +56,7 @@ public class ItemUser : MonoBehaviour
     public float DrinkTilt { get; private set; }    // 0..1 насколько запрокинули банку
 
     private ItemDefinition item;
+    private int smokeEvents;                     // какие моменты курения уже случились (биты)
     private int slotIndex;
     private float startTime;
     private bool effectDone;
@@ -61,6 +71,10 @@ public class ItemUser : MonoBehaviour
     void Awake()
     {
         if (drinkSound == null) drinkSound = Resources.Load<AudioClip>("Sounds/Player/drink_slurp");
+        if (lighterSound == null) lighterSound = Resources.Load<AudioClip>("Sounds/Player/Smoke/lighter");
+        if (inhaleSound == null) inhaleSound = Resources.Load<AudioClip>("Sounds/Player/Smoke/inhale");
+        if (exhaleSound == null) exhaleSound = Resources.Load<AudioClip>("Sounds/Player/Smoke/exhale");
+        if (exhaleLongSound == null) exhaleLongSound = Resources.Load<AudioClip>("Sounds/Player/Smoke/exhale_long");
         if (inventory == null) inventory = GetComponent<Inventory>();
         if (health == null) health = GetComponent<PlayerHealth>();
         if (weaponSwitcher == null) weaponSwitcher = GetComponentInChildren<WeaponSwitcher>(true);
@@ -89,6 +103,7 @@ public class ItemUser : MonoBehaviour
         slotIndex = index;
         startTime = Time.time;
         effectDone = false;
+        smokeEvents = 0;
         MouthWeight = 0f;
         DrinkTilt = 0f;
 
@@ -118,9 +133,11 @@ public class ItemUser : MonoBehaviour
     }
 
     // Глотки энергетика -- звук идёт, пока банка у рта
-    private void PlayDrink()
+    private void PlayDrink() => Play(drinkSound, drinkVolume);
+
+    private void Play(AudioClip clip, float volume)
     {
-        if (drinkSound == null) return;
+        if (clip == null) return;
         if (audioSource == null)
         {
             audioSource = gameObject.AddComponent<AudioSource>();
@@ -128,7 +145,15 @@ public class ItemUser : MonoBehaviour
             audioSource.spatialBlend = 0f;
         }
         audioSource.pitch = Random.Range(0.95f, 1.05f);
-        audioSource.PlayOneShot(drinkSound, drinkVolume);
+        audioSource.PlayOneShot(clip, volume);
+    }
+
+    // Событие курения срабатывает один раз за сигарету
+    private bool Once(int bit)
+    {
+        if ((smokeEvents & (1 << bit)) != 0) return false;
+        smokeEvents |= 1 << bit;
+        return true;
     }
 
     private void Finish(bool thrown)
@@ -188,42 +213,86 @@ public class ItemUser : MonoBehaviour
         UpdateThirdPersonProp();
     }
 
+    // Доли времени use: поднести 0..0.12, прикурить 0.12..0.2, затяжки 0.2..0.9, держим у груди 0.9..1
+    private const float SmokeRaise = 0.12f, SmokeLit = 0.2f, SmokeDragsEnd = 0.9f;
+
     private void AnimateSmoke(float t, float use)
     {
-        float raise = use * 0.3f, drag = use * 0.85f;
+        float u = t / use;
+        Quaternion mouthRot = Quaternion.Euler(cigMouthEuler), awayRot = Quaternion.Euler(cigExhaleEuler);
         Vector3 pos;
         Quaternion rot;
         float glow;
 
-        if (t < raise)
+        if (u < SmokeRaise)
         {
-            float k = Ease(t / raise);
+            float k = Ease(u / SmokeRaise);
             pos = Vector3.Lerp(restPos, cigMouthPos, k);
-            rot = Quaternion.Slerp(Quaternion.Euler(cigExhaleEuler), Quaternion.Euler(cigMouthEuler), k);
+            rot = Quaternion.Slerp(awayRot, mouthRot, k);
             MouthWeight = k;
-            glow = 0.3f;
+            glow = 0f;                                   // ещё не горит
         }
-        else if (t < drag)
+        else if (u < SmokeLit)
         {
-            float k = (t - raise) / (drag - raise);
-            pos = cigMouthPos + new Vector3(0f, 0f, -0.01f * Mathf.Sin(k * Mathf.PI)); // затяжка
-            rot = Quaternion.Euler(cigMouthEuler);
+            if (Once(0))                                 // чирк зажигалкой
+            {
+                Play(lighterSound, smokeVolume);
+                Sparks(ThirdPerson ? emberTP : emberFP);
+            }
+            float k = (u - SmokeRaise) / (SmokeLit - SmokeRaise);
+            pos = cigMouthPos;
+            rot = mouthRot;
             MouthWeight = 1f;
-            glow = Mathf.Lerp(0.3f, 1f, k);
+            glow = Mathf.Lerp(0.2f, 0.7f, k) + Mathf.Sin(k * 40f) * 0.15f;   // занимается, мерцая
         }
-        else if (t < use)
+        else if (u < SmokeDragsEnd)
         {
-            float k = Ease((t - drag) / (use - drag));
-            pos = Vector3.Lerp(cigMouthPos, cigExhalePos, k);
-            rot = Quaternion.Slerp(Quaternion.Euler(cigMouthEuler), Quaternion.Euler(cigExhaleEuler), k);
-            MouthWeight = 1f - k * 0.6f;
-            glow = 1f;
+            // Затяжка: у рта (огонёк разгорается) -> отвести -> выдох изо рта и носа -> обратно ко рту
+            int drags = Mathf.Max(1, smokeDrags);
+            float span = (SmokeDragsEnd - SmokeLit) / drags;
+            int d = Mathf.Min(drags - 1, (int)((u - SmokeLit) / span));
+            float k = (u - SmokeLit - d * span) / span;
+            bool last = d == drags - 1;
+            if (k < 0.5f)
+            {
+                if (Once(1 + d * 2))
+                {
+                    Play(inhaleSound, smokeVolume * 0.8f);
+                    if (look != null && !ThirdPerson) look.AddRecoil(dragHeadTilt, 0f);
+                }
+                float q = k / 0.5f;
+                pos = cigMouthPos + new Vector3(0f, 0f, -0.012f * Mathf.Sin(q * Mathf.PI));
+                rot = mouthRot;
+                MouthWeight = 1f;
+                glow = Mathf.Lerp(0.45f, 1f, q);
+            }
+            else
+            {
+                if (!last && Once(2 + d * 2))               // последнюю затяжку выдыхаем большим облаком
+                {
+                    Play(exhaleSound, smokeVolume);
+                    Puff();
+                }
+                float q = (k - 0.5f) / 0.5f;
+                float away = last ? Ease(Mathf.Clamp01(q * 1.6f)) : Mathf.Sin(q * Mathf.PI);   // отвели и вернули
+                pos = Vector3.Lerp(cigMouthPos, cigExhalePos, away);
+                rot = Quaternion.Slerp(mouthRot, awayRot, away);
+                MouthWeight = 1f - away * 0.6f;
+                glow = Mathf.Lerp(1f, 0.5f, q);
+            }
+        }
+        else if (u < 1f)
+        {
+            pos = cigExhalePos;
+            rot = awayRot;
+            MouthWeight = 0.4f;
+            glow = 0.5f;
         }
         else
         {
             float k = Ease((t - use) / putAwayTime);
             pos = Vector3.Lerp(cigExhalePos, restPos, k);
-            rot = Quaternion.Euler(cigExhaleEuler);
+            rot = awayRot;
             MouthWeight = 0.4f * (1f - k);
             glow = 0.5f;
         }
@@ -302,27 +371,62 @@ public class ItemUser : MonoBehaviour
 
     // ================= Эффекты =================
 
-    private void Exhale()
+    // Рот и направление «вперёд» для дыма: голова рыцаря от 3-го лица или камера от 1-го
+    private void MouthPoint(out Vector3 pos, out Vector3 dir, out Vector3 up)
     {
-        Transform from;
-        Vector3 pos, dir;
         if (ThirdPerson && knight != null && knight.HeadBone != null)
         {
-            from = knight.HeadBone;
-            pos = from.position + knight.transform.forward * 0.25f;
+            pos = knight.HeadBone.position + knight.transform.forward * 0.25f;
             dir = knight.transform.forward;
+            up = knight.transform.up;
         }
         else
         {
-            from = look.transform;
-            pos = from.position + from.forward * 0.3f - from.up * 0.08f;
-            dir = from.forward;
+            Transform cam = look.transform;
+            pos = cam.position + cam.forward * 0.3f - cam.up * 0.08f;
+            dir = cam.forward;
+            up = cam.up;
         }
+    }
 
-        GameObject go = new GameObject("ExhaleSmoke");
+    // Выдох после затяжки: небольшое облачко изо рта и две тонкие струйки из носа вниз
+    private void Puff()
+    {
+        MouthPoint(out Vector3 pos, out Vector3 dir, out Vector3 up);
+        Vector3 side = Vector3.Cross(up, dir).normalized;
+        SmokeAt(pos, dir, 0.5f);
+        foreach (float s in new[] { -1f, 1f })
+            SmokeAt(pos + up * 0.05f + side * (0.012f * s), (dir - up * 0.9f + side * (0.15f * s)).normalized, 0.25f);
+    }
+
+    private void SmokeAt(Vector3 pos, Vector3 dir, float size)
+    {
+        GameObject go = new GameObject("PuffSmoke");
         go.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(dir));
-        MakeSmoke(go.transform, true);
+        MakeSmoke(go.transform, true, size);
         Destroy(go, 4f);
+    }
+
+    // Искры от зажигалки у кончика сигареты
+    private void Sparks(Transform at)
+    {
+        if (at == null) return;
+        ParticleSystem ps = MakeSmoke(at, true, 0.15f);
+        var main = ps.main;
+        main.startColor = new Color(1f, 0.65f, 0.2f, 1f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.15f, 0.35f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1.2f);
+        main.gravityModifier = 0.6f;
+        var col = ps.colorOverLifetime;
+        col.enabled = false;
+        Destroy(ps.gameObject, 1f);
+    }
+
+    private void Exhale()
+    {
+        Play(exhaleLongSound, smokeVolume);
+        MouthPoint(out Vector3 pos, out Vector3 dir, out _);
+        SmokeAt(pos, dir, 1f);
     }
 
     private void Throw(GameObject source)
@@ -447,7 +551,8 @@ public class ItemUser : MonoBehaviour
     }
 
     // burst = облако при выдохе, иначе -- тонкий дымок с кончика сигареты
-    private ParticleSystem MakeSmoke(Transform parent, bool burst)
+    // scale -- масштаб облака (1 -- большой выдох): меньше частиц, мельче и медленнее
+    private ParticleSystem MakeSmoke(Transform parent, bool burst, float scale = 1f)
     {
         GameObject go = new GameObject(burst ? "Puff" : "Wisp");
         go.transform.SetParent(parent, false);
@@ -460,8 +565,9 @@ public class ItemUser : MonoBehaviour
         main.duration = burst ? 0.5f : 1f;
         main.loop = !burst;
         main.startLifetime = burst ? new ParticleSystem.MinMaxCurve(1.2f, 2.2f) : new ParticleSystem.MinMaxCurve(0.8f, 1.4f);
-        main.startSpeed = burst ? new ParticleSystem.MinMaxCurve(0.6f, 1.6f) : new ParticleSystem.MinMaxCurve(0.1f, 0.3f);
-        main.startSize = burst ? new ParticleSystem.MinMaxCurve(0.12f, 0.3f) : new ParticleSystem.MinMaxCurve(0.02f, 0.05f);
+        float sp = Mathf.Lerp(0.6f, 1f, scale);
+        main.startSpeed = burst ? new ParticleSystem.MinMaxCurve(0.6f * sp, 1.6f * sp) : new ParticleSystem.MinMaxCurve(0.1f, 0.3f);
+        main.startSize = burst ? new ParticleSystem.MinMaxCurve(0.12f * scale, 0.3f * scale) : new ParticleSystem.MinMaxCurve(0.02f, 0.05f);
         main.startColor = new Color(0.85f, 0.85f, 0.85f, burst ? 0.55f : 0.35f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.gravityModifier = -0.03f;
@@ -470,7 +576,7 @@ public class ItemUser : MonoBehaviour
 
         var emission = ps.emission;
         emission.rateOverTime = burst ? 0f : 14f;
-        if (burst) emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 28) });
+        if (burst) emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.Max(4, Mathf.RoundToInt(28 * scale))) });
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Cone;

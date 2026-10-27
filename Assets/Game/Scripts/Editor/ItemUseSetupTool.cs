@@ -66,7 +66,7 @@ public static class ItemUseSetupTool
             return;
         }
         item.useStyle = style;
-        item.useTime = 1f;
+        item.useTime = style == ItemDefinition.UseStyle.Smoke ? 3f : 1f;   // сигарета: прикурить и две затяжки
         item.heldPrefab = held;
         EditorUtility.SetDirty(item);
     }
