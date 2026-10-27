@@ -10,7 +10,8 @@ using UnityEngine.UI;
 //  - портрет рыцаря слева снизу (PlayerPortrait: живая 3D-голова в рамке) -- он же показывает здоровье;
 //  - справа от портрета -- таймер энергетика (пиксельная полоска из Pixel UI pack, если спрайты назначены);
 //  - патроны справа снизу (в магазине / в запасе);
-//  - прицел, всплывающие сообщения, красная вспышка при уроне, экран смерти.
+//  - прицел, всплывающие сообщения, красная вспышка при уроне;
+//  - экран смерти -- отдельный DeathScreen (своя канва поверх всего).
 public class GameHUD : MonoBehaviour
 {
     [Header("Refs (найдутся сами)")]
@@ -72,7 +73,6 @@ public class GameHUD : MonoBehaviour
     private const float MessageLifetime = 2.5f;
 
     private Image damageFlash;
-    private GameObject deathScreen;
 
     void Awake()
     {
@@ -97,8 +97,7 @@ public class GameHUD : MonoBehaviour
         BuildAmmo();
         BuildMessages();
         BuildInventory();
-        BuildDeathScreen();
-        portrait.transform.SetAsLastSibling();   // череп на портрете виден поверх экрана смерти
+        DeathScreen.Create(transform, health);
 
         if (inventory != null)
         {
@@ -411,18 +410,6 @@ public class GameHUD : MonoBehaviour
         return view;
     }
 
-    private void BuildDeathScreen()
-    {
-        Image bg = NewImage("Death", root, new Color(0.25f, 0f, 0f, 0.6f));
-        Stretch(bg.rectTransform);
-        Text t = NewText("Text", bg.rectTransform, 110, TextAnchor.MiddleCenter, new Color(0.9f, 0.1f, 0.1f));
-        t.text = "ПОТРАЧЕНО";
-        t.fontStyle = FontStyle.Bold;
-        Stretch(t.rectTransform);
-        deathScreen = bg.gameObject;
-        deathScreen.SetActive(false);
-    }
-
     // ---------------- Update ----------------
 
     private void UpdateBoost()
@@ -530,7 +517,6 @@ public class GameHUD : MonoBehaviour
     {
         if (inventory != null) inventory.SetOpen(false);
         PlayerInputLock.Locked = true;
-        if (deathScreen != null) deathScreen.SetActive(true);
     }
 
     private void OnInventoryOpenChanged(bool open)

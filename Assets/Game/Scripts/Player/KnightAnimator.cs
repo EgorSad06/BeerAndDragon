@@ -199,7 +199,8 @@ public class KnightAnimator : MonoBehaviour
     private void UpdateVisibility()
     {
         if (!hideInFirstPerson || viewCamera == null || boneHead == null) return;
-        bool fp = Vector3.Distance(viewCamera.position, boneHead.position) < firstPersonDistance && (health == null || !health.IsDead);
+        if (health != null && health.IsDead) return;   // после смерти не меняем: камера падает (DeathCamera), своё тело ей видеть незачем
+        bool fp = Vector3.Distance(viewCamera.position, boneHead.position) < firstPersonDistance;
         if (fp == shadowOnly) return;
         shadowOnly = fp;
         foreach (Renderer r in renderers)

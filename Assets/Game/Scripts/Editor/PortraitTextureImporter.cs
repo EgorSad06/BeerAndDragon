@@ -5,13 +5,31 @@ using UnityEngine;
 //  - Portrait* (рамка, кровь, череп) -- спрайты UI с прозрачностью; мип-карты (Kaiser, трилинейно, со сдвигом к
 //    чёткости), иначе тонкий узор рамки при уменьшении рассыпается в кашу;
 //  - KnightHelmet_0..4 -- стадии повреждений шлема (tools/blender/helmet_damage.py), обычные текстуры 1024.
+// Картинки экрана смерти (Resources/UI/Death, их грузит DeathScreen):
+//  - DeathCard -- карта таро: без сжатия и без подгонки к степени двойки, иначе тонкие линии гравюры плывут;
+//  - DeathFog -- дымка, тайлится (шейдер её прокручивает).
 public class PortraitTextureImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Resources/UI/Portrait/";
+    private const string DeathFolder = "Assets/Game/Resources/UI/Death/";
 
     void OnPreprocessTexture()
     {
-        if (!assetPath.Replace('\\', '/').StartsWith(Folder)) return;
+        string path = assetPath.Replace('\\', '/');
+        if (path.StartsWith(DeathFolder))
+        {
+            TextureImporter d = (TextureImporter)assetImporter;
+            d.textureType = TextureImporterType.Default;
+            d.npotScale = TextureImporterNPOTScale.None;
+            d.mipmapEnabled = true;
+            d.filterMode = FilterMode.Trilinear;
+            d.textureCompression = TextureImporterCompression.Uncompressed;
+            bool fog = System.IO.Path.GetFileName(path).StartsWith("DeathFog");
+            d.wrapMode = fog ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+            d.alphaIsTransparency = !fog;
+            return;
+        }
+        if (!path.StartsWith(Folder)) return;
         TextureImporter t = (TextureImporter)assetImporter;
         t.wrapMode = TextureWrapMode.Clamp;
         if (System.IO.Path.GetFileName(assetPath).StartsWith("Portrait"))

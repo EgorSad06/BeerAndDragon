@@ -1,13 +1,11 @@
 using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
-// Здоровье игрока. Вешается на корень Player. Смерть -- перезапуск сцены через restartDelay.
+// Здоровье игрока. Вешается на корень Player. После смерти -- экран смерти (DeathScreen), перезапуск оттуда.
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
     public float maxHealth = 100f;
-    public float restartDelay = 3f;
 
     public float Health { get; private set; }
     public bool IsDead { get; private set; }
@@ -66,19 +64,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private void Die()
     {
         IsDead = true;
-        GameLog.Info("Player", "Игрок погиб, перезапуск сцены через " + restartDelay + " с");
+        GameLog.Info("Player", "Игрок погиб");
         PlayerInputLock.Locked = true;
 
         KnightMovement movement = GetComponent<KnightMovement>();
         if (movement != null) movement.enabled = false;
 
         Died?.Invoke();
-        Invoke(nameof(Restart), restartDelay);
-    }
-
-    private void Restart()
-    {
-        PlayerInputLock.Locked = false;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }
