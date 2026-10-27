@@ -11,7 +11,7 @@ using UnityEngine.UI;
 //  - справа от портрета -- таймер энергетика (пиксельная полоска из Pixel UI pack, если спрайты назначены);
 //  - патроны справа снизу (в магазине / в запасе);
 //  - прицел, всплывающие сообщения, красная вспышка при уроне;
-//  - экран смерти -- отдельный DeathScreen (своя канва поверх всего).
+//  - пауза на Esc -- отдельный PauseMenu, экран смерти -- отдельный DeathScreen (свои канвы поверх HUD).
 public class GameHUD : MonoBehaviour
 {
     [Header("Refs (найдутся сами)")]
@@ -97,6 +97,7 @@ public class GameHUD : MonoBehaviour
         BuildAmmo();
         BuildMessages();
         BuildInventory();
+        PauseMenu.Create(transform, health, inventory);
         DeathScreen.Create(transform, health);
 
         if (inventory != null)

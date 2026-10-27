@@ -74,6 +74,7 @@ public class Inventory : MonoBehaviour
     void Update()
     {
         if (health != null && health.IsDead) return;
+        if (PauseMenu.IsPaused) return;   // на паузе ни рюкзак, ни хотбар не трогаем
 
         if (Input.GetKeyDown(toggleKey) || (IsOpen && Input.GetKeyDown(KeyCode.Escape)))
             SetOpen(!IsOpen);

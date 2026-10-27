@@ -30,6 +30,8 @@ public class PortraitTextureImporter : AssetPostprocessor
             m.wrapMode = TextureWrapMode.Clamp;
             m.maxTextureSize = 2048;
             m.textureCompression = TextureImporterCompression.Uncompressed;
+            // рамку с руками растягиваем по 9-slice в панель настроек: руки в верхних углах не тянутся
+            if (System.IO.Path.GetFileName(path).StartsWith("FrameHands")) m.spriteBorder = new Vector4(95f, 20f, 95f, 125f);
             return;
         }
         if (path.StartsWith(DeathFolder))

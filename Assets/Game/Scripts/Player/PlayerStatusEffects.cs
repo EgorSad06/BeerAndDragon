@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // Временные эффекты на игроке. Пока только ускорение от энергетика:
-// умножает скорости KnightMovement и слегка расширяет FOV.
+// умножает скорости KnightMovement и слегка расширяет FOV. Обычный FOV -- из настроек игрока (GameSettings).
 public class PlayerStatusEffects : MonoBehaviour
 {
     public KnightMovement movement;          // найдётся сам
@@ -15,7 +15,6 @@ public class PlayerStatusEffects : MonoBehaviour
     public float SpeedMultiplier { get; private set; } = 1f;
 
     private float baseWalk, baseSprint, baseSlide, baseCrouch;
-    private float baseFov;
 
     void Awake()
     {
@@ -29,7 +28,6 @@ public class PlayerStatusEffects : MonoBehaviour
             baseSlide = movement.slideSpeed;
             baseCrouch = movement.crouchSpeed;
         }
-        if (playerCamera != null) baseFov = playerCamera.fieldOfView;
     }
 
     public void ApplySpeedBoost(float multiplier, float duration)
@@ -55,7 +53,7 @@ public class PlayerStatusEffects : MonoBehaviour
 
         if (playerCamera != null)
         {
-            float target = baseFov + (SpeedBoostRemaining > 0f ? boostFovAdd : 0f);
+            float target = GameSettings.FieldOfView + (SpeedBoostRemaining > 0f ? boostFovAdd : 0f);
             playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, target, Time.deltaTime * fovLerpSpeed);
         }
     }

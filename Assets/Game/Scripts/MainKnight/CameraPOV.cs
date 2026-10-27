@@ -37,8 +37,10 @@ public class CameraPOV : MonoBehaviour
     {
         if (PlayerInputLock.Locked) return; // открыт инвентарь или игрок мёртв
 
-        float mouseX = Input.GetAxisRaw("Mouse X") * Time.deltaTime * sensX;
-        float mouseY = Input.GetAxisRaw("Mouse Y") * Time.deltaTime * sensY;
+        // чувствительность и инверсия -- из настроек игрока (GameSettings, страница SETTINGS в меню)
+        float sens = GameSettings.MouseSensitivity;
+        float mouseX = Input.GetAxisRaw("Mouse X") * Time.deltaTime * sensX * sens;
+        float mouseY = Input.GetAxisRaw("Mouse Y") * Time.deltaTime * sensY * sens * (GameSettings.InvertY ? -1f : 1f);
 
         yRotation += mouseX;
         xRotation -= mouseY;
@@ -54,9 +56,10 @@ public class CameraPOV : MonoBehaviour
     }
 
     // Вызывается оружием при выстреле: pitch -- вверх, yaw -- в сторону (градусы)
+    // Сила умножается на GameSettings.CameraKick (настройка «тряска камеры»)
     public void AddRecoil(float pitch, float yaw)
     {
-        recoilTarget += new Vector2(-pitch, yaw);
+        recoilTarget += new Vector2(-pitch, yaw) * GameSettings.CameraKick;
     }
 
 

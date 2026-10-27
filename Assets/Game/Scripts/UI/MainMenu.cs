@@ -7,7 +7,8 @@ using UnityEngine.UI;
 // Главное меню (сцена MainMenu). Всё строится из кода -- в сцене нужны только камера и объект с этим компонентом.
 //  - главная страница: PLAY / SETTINGS / CREDITS / EXIT;
 //  - PLAY -- три слота сохранений (рамка с крестом); сохранений пока нет: любой слот грузит gameScene;
-//  - SETTINGS -- свой фон с шестерёнкой, пока пусто; CREDITS -- пусто; на обеих только BACK (и Esc);
+//  - SETTINGS -- свой фон с шестерёнкой: громкость, мышь, FOV, тряска камеры, полный экран (MenuSettingsPage, GameSettings);
+//  - CREDITS -- пусто; назад -- BACK или Esc;
 //  - кнопки -- рамка с руками, надписи шрифтом Pirata One (в нём только латиница, поэтому по-английски);
 //  - при наведении карточка «левитирует», как карточки в Steam: приподнимается над своей тенью, покачивается
 //    и наклоняется в перспективе к курсору (MenuButtonHover + MenuCardTilt).
@@ -25,7 +26,7 @@ public class MainMenu : MonoBehaviour
     public float slotScale = 0.92f;                              // рамка с крестом 480x260
     public float pageFadeTime = 0.18f;
 
-    private const string Folder = "UI/Menu/";
+    public const string Folder = "UI/Menu/";
     private const float ColumnX = -500f;                        // левая половина фона пустая -- кнопки там
 
     private enum Page { Main, Play, Settings, Credits }
@@ -67,7 +68,9 @@ public class MainMenu : MonoBehaviour
             SaveSlot(play.transform, i, numerals[i], new Vector2(ColumnX, 330f - i * 260f));
         HandsButton(play.transform, "BACK", new Vector2(ColumnX, -420f), () => Open(Page.Main), 0.8f);
 
-        HandsButton(NewPage(Page.Settings).transform, "BACK", new Vector2(ColumnX, -380f), () => Open(Page.Main));
+        CanvasGroup settings = NewPage(Page.Settings);
+        MenuSettingsPage.Build(settings.transform, font, Resources.Load<Sprite>(Folder + "FrameHands"), new Vector2(-390f, 50f), textColor, slotHoverColor);
+        HandsButton(settings.transform, "BACK", new Vector2(-390f, -430f), () => Open(Page.Main), 0.8f);
         HandsButton(NewPage(Page.Credits).transform, "BACK", new Vector2(ColumnX, -380f), () => Open(Page.Main));
 
         foreach (var p in pages) SetPage(p.Value, p.Key == current ? 1f : 0f);
@@ -151,15 +154,21 @@ public class MainMenu : MonoBehaviour
         return g;
     }
 
-    // Кнопка в рамке с руками: надпись -- в прямоугольнике между ладонями, чуть ниже середины картинки
     private void HandsButton(Transform parent, string label, Vector2 pos, UnityEngine.Events.UnityAction onClick, float scale = 1f)
     {
-        float k = buttonScale * scale;
+        HandsCard(parent, font, label, pos, buttonScale * scale, textColor, hoverColor, onClick);
+    }
+
+    // Кнопка в рамке с руками (k -- масштаб картинки 462x220): надпись -- в прямоугольнике между ладонями,
+    // чуть ниже середины. Ей же пользуется пауза в игре (PauseMenu).
+    public static Button HandsCard(Transform parent, Font font, string label, Vector2 pos, float k, Color textColor, Color hoverColor,
+        UnityEngine.Events.UnityAction onClick)
+    {
         Image shadow = Card(parent, label, "FrameHands", pos, new Vector2(462f, 220f) * k, out Image frame);
-        Text t = NewText("Label", frame.rectTransform, Mathf.RoundToInt(96 * k), textColor);
+        Text t = NewText("Label", frame.rectTransform, font, Mathf.RoundToInt(96 * k), textColor);
         t.text = label;
         Place(t.rectTransform, new Vector2(0f, -14f * k), new Vector2(330f, 150f) * k);
-        AddButton(shadow, frame, t, textColor, hoverColor, onClick);
+        return AddButton(shadow, frame, t, textColor, hoverColor, onClick);
     }
 
     // Слот сохранения в рамке с крестом: надпись -- в сером прямоугольнике справа от креста
@@ -167,10 +176,10 @@ public class MainMenu : MonoBehaviour
     {
         float k = slotScale;
         Image shadow = Card(parent, "Slot" + (index + 1), "FrameCross", pos, new Vector2(480f, 260f) * k, out Image frame);
-        Text t = NewText("Label", frame.rectTransform, Mathf.RoundToInt(78 * k), slotTextColor);
+        Text t = NewText("Label", frame.rectTransform, font, Mathf.RoundToInt(78 * k), slotTextColor);
         t.text = "SAVE " + numeral;
         Place(t.rectTransform, new Vector2(42f, 32f) * k, new Vector2(340f, 90f) * k);
-        Text empty = NewText("State", frame.rectTransform, Mathf.RoundToInt(44 * k), new Color(slotTextColor.r, slotTextColor.g, slotTextColor.b, 0.6f));
+        Text empty = NewText("State", frame.rectTransform, font, Mathf.RoundToInt(44 * k), new Color(slotTextColor.r, slotTextColor.g, slotTextColor.b, 0.6f));
         empty.text = "empty";
         Place(empty.rectTransform, new Vector2(42f, -40f) * k, new Vector2(340f, 60f) * k);
         AddButton(shadow, frame, t, slotTextColor, slotHoverColor, () => StartGame(index));
@@ -189,7 +198,7 @@ public class MainMenu : MonoBehaviour
         return shadow;
     }
 
-    private static void AddButton(Image shadow, Image frame, Text label, Color normal, Color hover, UnityEngine.Events.UnityAction onClick)
+    private static Button AddButton(Image shadow, Image frame, Text label, Color normal, Color hover, UnityEngine.Events.UnityAction onClick)
     {
         shadow.raycastTarget = true;
         Button b = shadow.gameObject.AddComponent<Button>();
@@ -202,6 +211,7 @@ public class MainMenu : MonoBehaviour
         h.label = label;
         h.normal = normal;
         h.hover = hover;
+        return b;
     }
 
     // ---------------- UI helpers ----------------
@@ -221,7 +231,7 @@ public class MainMenu : MonoBehaviour
         return img;
     }
 
-    private Text NewText(string name, Transform parent, int size, Color color)
+    private static Text NewText(string name, Transform parent, Font font, int size, Color color)
     {
         Text t = NewRect(name, parent).gameObject.AddComponent<Text>();
         t.font = font;
