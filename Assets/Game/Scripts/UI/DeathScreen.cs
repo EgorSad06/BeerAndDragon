@@ -8,7 +8,7 @@ using UnityEngine.UI;
 //  - камера падает на землю (DeathCamera), весь остальной UI (патроны, портрет, хотбар...) гаснет;
 //  - экран темнеет, по углам наползает серая могильная дымка (DeathFog: кадр из гифки, плывёт двумя слоями);
 //  - из дымки сверху вниз проявляется карта таро «Смерть» (DeathCard);
-//  - под ней меню: «Ещё раз» -- перезапуск сцены; «Настройки» и «В меню» -- пока заглушки.
+//  - под ней меню: «Ещё раз» -- перезапуск сцены; «В меню» -- главное меню (MainMenu); «Настройки» -- пока заглушка.
 // Картинки -- Resources/UI/Death (их готовит tools/ui/death_assets.py), там же шейдеры.
 public class DeathScreen : MonoBehaviour
 {
@@ -18,6 +18,8 @@ public class DeathScreen : MonoBehaviour
     public float fogStart = 0.3f, fogTime = 3f;
     public float cardStart = 2.2f, cardTime = 3.2f;
     public float menuStart = 5.2f, menuFadeTime = 0.6f;
+
+    public string menuScene = "MainMenu";
 
     [Header("Вид")]
     [Range(0f, 1f)] public float darkness = 0.96f;
@@ -108,7 +110,7 @@ public class DeathScreen : MonoBehaviour
         menu = m.gameObject.AddComponent<CanvasGroup>();
         AddButton(m, "ЕЩЁ РАЗ", -360f, Retry);
         AddButton(m, "НАСТРОЙКИ", 0f, () => ShowNote("Настройки пока не готовы"));
-        AddButton(m, "В МЕНЮ", 360f, () => ShowNote("Главного меню пока нет"));
+        AddButton(m, "В МЕНЮ", 360f, () => LoadScene(menuScene));
 
         note = NewText("Note", content.transform, 24, new Color(textColor.r, textColor.g, textColor.b, 0f));
         Place(note.rectTransform, new Vector2(0f, 70f - cardHeight * 0.5f - 140f), new Vector2(800f, 30f));
@@ -220,12 +222,14 @@ public class DeathScreen : MonoBehaviour
         noteTime = Time.unscaledTime;
     }
 
-    private void Retry()
+    private void Retry() => LoadScene(SceneManager.GetActiveScene().name);
+
+    private static void LoadScene(string scene)
     {
         Time.timeScale = 1f;
         PlayerInputLock.Locked = false;
         PlayerInputLock.WeaponsBlocked = false;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        SceneManager.LoadScene(scene);
     }
 
     private static float Smooth(float x)

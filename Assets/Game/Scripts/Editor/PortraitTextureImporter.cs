@@ -8,14 +8,30 @@ using UnityEngine;
 // Картинки экрана смерти (Resources/UI/Death, их грузит DeathScreen):
 //  - DeathCard -- карта таро: без сжатия и без подгонки к степени двойки, иначе тонкие линии гравюры плывут;
 //  - DeathFog -- дымка, тайлится (шейдер её прокручивает).
+// Картинки главного меню (Resources/UI/Menu, их грузит MainMenu): спрайты UI без сжатия -- фоны 1920x1080
+// и рамки кнопок; мип-карты, чтобы уменьшенные рамки не рябили.
 public class PortraitTextureImporter : AssetPostprocessor
 {
     private const string Folder = "Assets/Game/Resources/UI/Portrait/";
     private const string DeathFolder = "Assets/Game/Resources/UI/Death/";
+    private const string MenuFolder = "Assets/Game/Resources/UI/Menu/";
 
     void OnPreprocessTexture()
     {
         string path = assetPath.Replace('\\', '/');
+        if (path.StartsWith(MenuFolder))
+        {
+            TextureImporter m = (TextureImporter)assetImporter;
+            m.textureType = TextureImporterType.Sprite;
+            m.spriteImportMode = SpriteImportMode.Single;
+            m.alphaIsTransparency = true;
+            m.mipmapEnabled = true;
+            m.filterMode = FilterMode.Trilinear;
+            m.wrapMode = TextureWrapMode.Clamp;
+            m.maxTextureSize = 2048;
+            m.textureCompression = TextureImporterCompression.Uncompressed;
+            return;
+        }
         if (path.StartsWith(DeathFolder))
         {
             TextureImporter d = (TextureImporter)assetImporter;
